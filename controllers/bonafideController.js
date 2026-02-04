@@ -89,7 +89,7 @@ exports.confirmForm = async (req, res) => {
     const fileName = `${day}-${month}-${year}-bonafide-certificate-${finalData.rollno}.docx`;
 
     // Send email with DOCX attachment
-    await sendBonafideNotification(finalData, buffer, fileName);
+    //await sendBonafideNotification(finalData, buffer, fileName);
 
     req.session.bonafideData = null;
     res.render('success', { name: finalData.name });
