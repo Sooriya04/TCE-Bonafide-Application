@@ -9,7 +9,7 @@ exports.downloadDocx = async (req, res) => {
     }
 
     const docSnap = await db.collection('bonafideForms').doc(id).get();
-    
+
     if (!docSnap.exists) {
       return res.status(404).send('Form not found');
     }
@@ -42,6 +42,7 @@ exports.downloadDocx = async (req, res) => {
       scholarshipType: (rawData.scholarshipType || '').toString(),
       date: (rawData.date || '').toString(),
       academicYear: (rawData.academicYear || '').toString(),
+      cYear: (rawData.cYear || '').toString(),
       himHer: getHimHer(rawData.title)
     };
 
@@ -63,12 +64,12 @@ exports.downloadDocx = async (req, res) => {
 
   } catch (err) {
     console.error('Error in downloadDocx controller:', err);
-    
+
     if (err.properties && err.properties.errors) {
       console.error('Template errors:', JSON.stringify(err.properties.errors, null, 2));
       return res.status(500).send('Template formatting error');
     }
-    
+
     return res.status(500).send('Error generating document');
   }
 };

@@ -1,272 +1,253 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>TCE Bonafide Form</title>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Bootstrap grid & utilities -->
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap"
-      rel="stylesheet"
-    />
+<head>
+  <title>TCE Bonafide Form</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <style>
-      .form-control,
-      .form-select,
-      .btn {
-        border-radius: 8px !important;
-        border: 1px solid #ccc !important;
-        background-color: #fff !important;
-        box-shadow: none !important;
-      }
-      .form-control:focus,
-      .form-select:focus {
-        outline: none !important;
-        border-color: #800000 !important;
-        box-shadow: 0 0 5px rgba(128, 0, 0, 0.3) !important;
-      }
-      body {
-        background-color: #fffdf5;
-        font-family: 'Montserrat', sans-serif;
-      }
-      header {
-        display: flex;
-        align-items: center;
-        padding: 10px 30px;
-        background-color: #f1f1f1;
-      }
-      header img {
-        width: 300px;
-        height: auto;
-      }
-      .form-card {
-        background-color: white;
-        border-radius: 20px;
-        max-width: 600px;
-        width: 100%;
-        padding: 2.5rem 2rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      }
-      .title {
-        color: #800000;
-        font-size: 1.8rem;
-        font-weight: bold;
-      }
-      .subtitle {
-        color: #a05252;
-        font-size: 1rem;
-      }
-      .sod-field {
-        display: flex;
-        gap: 10px;
-      }
-      .btn-maroon {
-        background-color: #800000 !important;
-        color: white !important;
-        border-radius: 20px !important;
-        padding: 10px !important;
-        width: 60%;
-        font-size: 1.1rem;
-        border: none !important;
-        transition: background-color 0.3s ease;
-      }
-      .btn-maroon:hover {
-        background-color: #660000 !important;
-      }
-    </style>
-  </head>
-  <body>
-    <header>
-      <img
-        src="/images/tce_logo.png"
-        alt="TCE Logo"
-      />
-    </header>
+  <!-- Bootstrap grid & utilities -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet" />
 
-    <div class="container my-5 d-flex justify-content-center">
-      <div class="form-card">
-        <h2 class="title text-center mb-2">TCE Bonafide Form</h2>
-        <p class="subtitle text-center mb-4">
-          Fill in the details below to generate your certificate
-        </p>
+  <style>
+    .form-control,
+    .form-select,
+    .btn {
+      border-radius: 8px !important;
+      border: 1px solid #ccc !important;
+      background-color: #fff !important;
+      box-shadow: none !important;
+    }
 
-        <form action="/bonafide/preview" method="POST" id="bonafideForm">
-          <!-- Title -->
-          <div class="mb-3">
-            <label for="title" class="form-label">Mr/Ms *</label>
-            <select class="form-select" name="title" id="title" required>
-              <option value="" disabled <%= !formData.title ? 'selected' : '' %>>
-                Select
-              </option>
-              <option value="Mr." <%= formData.title === 'Mr.' ? 'selected' : '' %>>Mr.</option>
-              <option value="Ms." <%= formData.title === 'Ms.' ? 'selected' : '' %>>Ms.</option>
+    .form-control:focus,
+    .form-select:focus {
+      outline: none !important;
+      border-color: #800000 !important;
+      box-shadow: 0 0 5px rgba(128, 0, 0, 0.3) !important;
+    }
+
+    body {
+      background-color: #fffdf5;
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      padding: 10px 30px;
+      background-color: #f1f1f1;
+    }
+
+    header img {
+      width: 300px;
+      height: auto;
+    }
+
+    .form-card {
+      background-color: white;
+      border-radius: 20px;
+      max-width: 600px;
+      width: 100%;
+      padding: 2.5rem 2rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .title {
+      color: #800000;
+      font-size: 1.8rem;
+      font-weight: bold;
+    }
+
+    .subtitle {
+      color: #a05252;
+      font-size: 1rem;
+    }
+
+    .sod-field {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-maroon {
+      background-color: #800000 !important;
+      color: white !important;
+      border-radius: 20px !important;
+      padding: 10px !important;
+      width: 60%;
+      font-size: 1.1rem;
+      border: none !important;
+      transition: background-color 0.3s ease;
+    }
+
+    .btn-maroon:hover {
+      background-color: #660000 !important;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <img src="/images/tce_logo.png" alt="TCE Logo" />
+  </header>
+
+  <div class="container my-5 d-flex justify-content-center">
+    <div class="form-card">
+      <h2 class="title text-center mb-2">TCE Bonafide Form</h2>
+      <p class="subtitle text-center mb-4">
+        Fill in the details below to generate your certificate
+      </p>
+
+      <form action="/bonafide/preview" method="POST" id="bonafideForm">
+        <!-- Title -->
+        <div class="mb-3">
+          <label for="title" class="form-label">Mr/Ms *</label>
+          <select class="form-select" name="title" id="title" required>
+            <option value="" disabled <%=!formData.title ? 'selected' : '' %>>
+              Select
+            </option>
+            <option value="Mr." <%=formData.title==='Mr.' ? 'selected' : '' %>>Mr.</option>
+            <option value="Ms." <%=formData.title==='Ms.' ? 'selected' : '' %>>Ms.</option>
+          </select>
+        </div>
+
+        <!-- Name -->
+        <div class="mb-3">
+          <label for="name" class="form-label">Name *</label>
+          <input type="text" class="form-control" name="name" id="name" value="<%= formData.name || '' %>" required />
+        </div>
+
+        <!-- Roll No -->
+        <div class="mb-3">
+          <label for="rollno" class="form-label">Roll No *</label>
+          <input type="text" class="form-control" name="rollno" id="rollno" value="<%= formData.rollno || '' %>"
+            required />
+        </div>
+
+        <!-- Relation -->
+        <div class="mb-3">
+          <label class="form-label">S/o or D/o *</label>
+          <div class="sod-field">
+            <select class="form-select" name="relation" id="relation" required>
+              <option value="" disabled <%=!formData.relation ? 'selected' : '' %>>Select</option>
+              <option value="S/o" <%=formData.relation==='S/o' ? 'selected' : '' %>>S/o</option>
+              <option value="D/o" <%=formData.relation==='D/o' ? 'selected' : '' %>>D/o</option>
+            </select>
+            <input type="text" class="form-control" name="parentName" placeholder="Parent's Name"
+              value="<%= formData.parentName || '' %>" required />
+          </div>
+        </div>
+
+        <!-- Year + Course -->
+        <div class="row">
+          <div class="mb-3 col-md-6">
+            <label for="year" class="form-label">Year *</label>
+            <select class="form-select" name="year" id="year" required>
+              <option value="" disabled <%=!formData.year ? 'selected' : '' %>>Select</option>
+              <option <%=formData.year==='I' ? 'selected' : '' %>>I</option>
+              <option <%=formData.year==='II' ? 'selected' : '' %>>II</option>
+              <option <%=formData.year==='III' ? 'selected' : '' %>>III</option>
+              <option <%=formData.year==='IV' ? 'selected' : '' %>>IV</option>
             </select>
           </div>
-
-          <!-- Name -->
-          <div class="mb-3">
-            <label for="name" class="form-label">Name *</label>
-            <input
-              type="text"
-              class="form-control"
-              name="name"
-              id="name"
-              value="<%= formData.name || '' %>"
-              required
-            />
+          <div class="mb-3 col-md-6">
+            <label for="course" class="form-label">Course *</label>
+            <select class="form-select" name="course" id="course" required>
+              <option value="" disabled <%=!formData.course ? 'selected' : '' %>>Select</option>
+              <option <%=formData.course==='B.E' ? 'selected' : '' %>>B.E</option>
+              <option <%=formData.course==='B.Tech' ? 'selected' : '' %>>B.Tech</option>
+              <option <%=formData.course==='M.E' ? 'selected' : '' %>>M.E</option>
+              <option <%=formData.course==='MCA' ? 'selected' : '' %>>MCA</option>
+              <option <%=formData.course==='B.Arch' ? 'selected' : '' %>>B.Arch</option>
+              <option <%=formData.course==='M.Arch' ? 'selected' : '' %>>M.Arch</option>
+              <option <%=formData.course==='M.Plan' ? 'selected' : '' %>>M.Plan</option>
+              <option <%=formData.course==='Part Time B.E' ? 'selected' : '' %>>Part Time B.E</option>
+              <option <%=formData.course==='B.Des' ? 'selected' : '' %>>B.Des</option>
+            </select>
           </div>
+        </div>
 
-          <!-- Roll No -->
-          <div class="mb-3">
-            <label for="rollno" class="form-label">Roll No *</label>
-            <input
-              type="text"
-              class="form-control"
-              name="rollno"
-              id="rollno"
-              value="<%= formData.rollno || '' %>"
-              required
-            />
-          </div>
-
-          <!-- Relation -->
-          <div class="mb-3">
-            <label class="form-label">S/o or D/o *</label>
-            <div class="sod-field">
-              <select class="form-select" name="relation" id="relation" required>
-                <option value="" disabled <%= !formData.relation ? 'selected' : '' %>>Select</option>
-                <option value="S/o" <%= formData.relation === 'S/o' ? 'selected' : '' %>>S/o</option>
-                <option value="D/o" <%= formData.relation === 'D/o' ? 'selected' : '' %>>D/o</option>
-              </select>
-              <input
-                type="text"
-                class="form-control"
-                name="parentName"
-                placeholder="Parent's Name"
-                value="<%= formData.parentName || '' %>"
-                required
-              />
-            </div>
-          </div>
-
-          <!-- Year + Course -->
-          <div class="row">
-            <div class="mb-3 col-md-6">
-              <label for="year" class="form-label">Year *</label>
-              <select class="form-select" name="year" id="year" required>
-                <option value="" disabled <%= !formData.year ? 'selected' : '' %>>Select</option>
-                <option <%= formData.year==='I' ? 'selected' : '' %>>I</option>
-                <option <%= formData.year==='II' ? 'selected' : '' %>>II</option>
-                <option <%= formData.year==='III' ? 'selected' : '' %>>III</option>
-                <option <%= formData.year==='IV' ? 'selected' : '' %>>IV</option>
-              </select>
-            </div>
-            <div class="mb-3 col-md-6">
-              <label for="course" class="form-label">Course *</label>
-              <select class="form-select" name="course" id="course" required>
-                <option value="" disabled <%= !formData.course ? 'selected' : '' %>>Select</option>
-                <option <%= formData.course==='B.E' ? 'selected' : '' %>>B.E</option>
-                <option <%= formData.course==='B.Tech' ? 'selected' : '' %>>B.Tech</option>
-                <option <%= formData.course==='M.E' ? 'selected' : '' %>>M.E</option>
-                <option <%= formData.course==='MCA' ? 'selected' : '' %>>MCA</option>
-                <option <%= formData.course==='B.Arch' ? 'selected' : '' %>>B.Arch</option>
-                <option <%= formData.course==='M.Arch' ? 'selected' : '' %>>M.Arch</option>
-                <option <%= formData.course==='M.Plan' ? 'selected' : '' %>>M.Plan</option>
-                <option <%= formData.course==='Part Time B.E' ? 'selected' : '' %>>Part Time B.E</option>
-                <option <%= formData.course==='B.Des' ? 'selected' : '' %>>B.Des</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Branch -->
-          <div class="mb-3">
-            <label for="branch" class="form-label">Branch *</label>
-            <select class="form-select" name="branch" id="branch" required>
-              <option value="" disabled <%= !formData.branch ? 'selected' : '' %>>Select</option>
-              <% [
-                "Information Technology",
-                "Computer Science Engineering",
-                "Architecture",
-                "Civil Engineering",
-                "Computer Science and Business Systems",
-                "Computer Applications",
-                "Applied Mathematics and Computational Science",
-                "Electronics and Communication Engineering",
-                "Electrical and Electronics Engineering",
-                "Mechanical Engineering",
-                "AI/ML",
-                "Data Science (5 Years Integrated Course)",
-                "Communication Systems",
-                "Construction Engineering and Management",
-                "Structural Engineering",
-                "Planning",
-                "Mechatronics",
-                "Interior Design"
+        <!-- Branch -->
+        <div class="mb-3">
+          <label for="branch" class="form-label">Branch *</label>
+          <select class="form-select" name="branch" id="branch" required>
+            <option value="" disabled <%=!formData.branch ? 'selected' : '' %>>Select</option>
+            <% [ "Architecture" , "Civil Engineering" , "Communication Systems" , "Computer Applications"
+              , "Computer Science and Business Systems" , "Computer Science Engineering"
+              , "Construction Engineering and Management" , "CSE(Artificial Intelligence and Machine Learning)"
+              , "Data Science (5 Years Integrated Course)" , "Electrical and Electronics Engineering"
+              , "Electronics and Communication Engineering" , "Information Technology" , "Interior Design"
+              , "Mechanical Engineering" , "Mechatronics" , "Planning" , "Structural Engineering"
               ].forEach(function(branch){ %>
-                <option value="<%= branch %>" <%= formData.branch===branch ? 'selected' : '' %>><%= branch %></option>
+              <option value="<%= branch %>" <%=formData.branch===branch ? 'selected' : '' %>><%= branch %>
+              </option>
               <% }) %>
-            </select>
-          </div>
+          </select>
+        </div>
 
-          <!-- Certificate For -->
-          <div class="mb-3">
-            <label for="certificateFor" class="form-label">Certificate For *</label>
-            <select class="form-select" name="certificateFor" id="certificateFor" required>
-              <option value="" disabled <%= !formData.certificateFor ? 'selected' : '' %>>Select</option>
-              <option <%= formData.certificateFor==='Educational Loan' ? 'selected' : '' %>>Educational Loan</option>
-              <option <%= formData.certificateFor==='Scholarship' ? 'selected' : '' %>>Scholarship</option>
-              <option <%= formData.certificateFor==='Bus Pass' ? 'selected' : '' %>>Bus Pass</option>
-              <option <%= formData.certificateFor==='Passport' ? 'selected' : '' %>>Passport</option>
-              <option <%= formData.certificateFor==='VISA' ? 'selected' : '' %>>VISA</option>
-            </select>
-          </div>
+        <!-- Certificate For -->
+        <div class="mb-3">
+          <label for="certificateFor" class="form-label">Certificate For *</label>
+          <select class="form-select" name="certificateFor" id="certificateFor" required>
+            <option value="" disabled <%=!formData.certificateFor ? 'selected' : '' %>>Select</option>
+            <option <%=formData.certificateFor==='Educational Loan' ? 'selected' : '' %>>Educational Loan</option>
+            <option <%=formData.certificateFor==='Scholarship' ? 'selected' : '' %>>Scholarship</option>
+            <option <%=formData.certificateFor==='Bus Pass' ? 'selected' : '' %>>Bus Pass</option>
+            <option <%=formData.certificateFor==='Passport' ? 'selected' : '' %>>Passport</option>
+            <option <%=formData.certificateFor==='VISA' ? 'selected' : '' %>>VISA</option>
+            <option <%=formData.certificateFor==='Custom' ? 'selected' : '' %>>Custom</option>
+          </select>
+        </div>
 
-          <!-- Scholarship Type -->
-          <div class="mb-3" id="scholarshipTypeDiv" style="display:<%= formData.certificateFor==='Scholarship' ? 'block' : 'none' %>">
-            <label for="scholarshipType" class="form-label">Mention Scholarship Type</label>
-            <input
-              type="text"
-              class="form-control"
-              name="scholarshipType"
-              id="scholarshipType"
-              value="<%= formData.scholarshipType || '' %>"
-              placeholder="e.g., Merit-based, Sports, etc."
-            />
-          </div>
+        <!-- Scholarship Type -->
+        <div class="mb-3" id="scholarshipTypeDiv"
+          style="display:<%= formData.certificateFor==='Scholarship' ? 'block' : 'none' %>">
+          <label for="scholarshipType" class="form-label">Mention Scholarship Type</label>
+          <input type="text" class="form-control" name="scholarshipType" id="scholarshipType"
+            value="<%= formData.scholarshipType || '' %>" placeholder="e.g., Merit-based, Sports, etc." />
+        </div>
 
-          <!-- Date -->
-          <div class="mb-3">
-            <label for="date" class="form-label">Date *</label>
-            <input
-              type="date"
-              class="form-control"
-              name="date"
-              id="date"
-              value="<%= formData.date || '' %>"
-              required
-            />
-          </div>
+        <!-- Custom Certificate For -->
+        <div class="mb-3" id="customCertificateForDiv"
+          style="display:<%= formData.certificateFor==='Custom' ? 'block' : 'none' %>">
+          <label for="customCertificateFor" class="form-label">Specify Purpose *</label>
+          <input type="text" class="form-control" name="customCertificateFor" id="customCertificateFor"
+            value="<%= formData.customCertificateFor || '' %>" placeholder="e.g., Railway Concession, etc." />
+        </div>
 
-          <!-- Submit -->
-          <div class="text-center">
-            <button type="submit" class="btn btn-maroon px-5">Preview</button>
-          </div>
-        </form>
-      </div>
+        <!-- Date -->
+        <div class="mb-3">
+          <label for="date" class="form-label">Date *</label>
+          <input type="date" class="form-control" name="date" id="date" value="<%= formData.date || '' %>" required />
+        </div>
+
+        <!-- Submit -->
+        <div class="text-center">
+          <button type="submit" class="btn btn-maroon px-5">Preview</button>
+        </div>
+      </form>
     </div>
+  </div>
 
-    <script>
-      document
-        .getElementById('certificateFor')
-        .addEventListener('change', function () {
-          document.getElementById('scholarshipTypeDiv').style.display =
-            this.value === 'Scholarship' ? 'block' : 'none';
-        });
-    </script>
-  </body>
+  <script>
+    document
+      .getElementById('certificateFor')
+      .addEventListener('change', function () {
+        document.getElementById('scholarshipTypeDiv').style.display =
+          this.value === 'Scholarship' ? 'block' : 'none';
+        document.getElementById('customCertificateForDiv').style.display =
+          this.value === 'Custom' ? 'block' : 'none';
+
+        // Make custom input required only when Custom is selected
+        const customInput = document.getElementById('customCertificateFor');
+        if (this.value === 'Custom') {
+          customInput.setAttribute('required', 'required');
+        } else {
+          customInput.removeAttribute('required');
+          customInput.value = '';
+        }
+      });
+  </script>
+</body>
+
 </html>
