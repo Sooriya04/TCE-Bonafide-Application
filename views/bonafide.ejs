@@ -173,7 +173,7 @@
           <select class="form-select" name="branch" id="branch" required>
             <option value="" disabled <%=!formData.branch ? 'selected' : '' %>>Select</option>
             <% [ "Architecture" , "Civil Engineering" , "Communication Systems" , "Computer Applications"
-              , "Computer Science and Business Systems" , "Computer Science Engineering"
+              , "Computer Science and Business Systems" , "Computer Science and Engineering"
               , "Construction Engineering and Management" , "CSE(Artificial Intelligence and Machine Learning)"
               , "Data Science (5 Years Integrated Course)" , "Electrical and Electronics Engineering"
               , "Electronics and Communication Engineering" , "Information Technology" , "Interior Design"
@@ -215,11 +215,6 @@
             value="<%= formData.customCertificateFor || '' %>" placeholder="e.g., Railway Concession, etc." />
         </div>
 
-        <!-- Date -->
-        <div class="mb-3">
-          <label for="date" class="form-label">Date *</label>
-          <input type="date" class="form-control" name="date" id="date" value="<%= formData.date || '' %>" required />
-        </div>
 
         <!-- Submit -->
         <div class="text-center">

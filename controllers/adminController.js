@@ -42,3 +42,21 @@ exports.getAdminPage = async (req, res) => {
     return res.status(500).send('Error loading admin page');
   }
 };
+
+exports.toggleDownloaded = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { downloaded } = req.body;
+
+    if (!id) return res.status(400).json({ error: 'Missing id' });
+
+    await db.collection('bonafideForms').doc(id).update({
+      downloaded: !!downloaded,
+    });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Error toggling downloaded status:', err);
+    return res.status(500).json({ error: 'Failed to update' });
+  }
+};

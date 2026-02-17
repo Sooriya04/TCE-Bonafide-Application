@@ -40,6 +40,11 @@ exports.postForm = (req, res) => {
       certificateFor = customCertificateFor.trim();
     }
 
+    // Auto-set today's date (YYYY-MM-DD)
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const todayDate = `${currentYear}-${month}-${day}`;
+
     const formData = {
       title: req.body.title,
       name: req.body.name,
@@ -52,7 +57,7 @@ exports.postForm = (req, res) => {
       certificateFor,
       customCertificateFor,
       scholarshipType: req.body.scholarshipType || '',
-      date: req.body.date,
+      date: todayDate,
       academicYear,
       cYear: currentYear
     };
