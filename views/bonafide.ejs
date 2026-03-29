@@ -106,15 +106,19 @@
             <option value="" disabled <%=!formData.title ? 'selected' : '' %>>
               Select
             </option>
-            <option value="Mr." <%=formData.title==='Mr.' ? 'selected' : '' %>>Mr.</option>
-            <option value="Ms." <%=formData.title==='Ms.' ? 'selected' : '' %>>Ms.</option>
+            <option value="Mr" <%=formData.title==='Mr' ? 'selected' : '' %>>Mr</option>
+            <option value="Ms" <%=formData.title==='Ms' ? 'selected' : '' %>>Ms</option>
           </select>
         </div>
 
         <!-- Name -->
         <div class="mb-3">
-          <label for="name" class="form-label">Name *</label>
-          <input type="text" class="form-control" name="name" id="name" value="<%= formData.name || '' %>" required />
+          <label for="name" class="form-label">Name (Initial at last) *</label>
+          <input type="text" class="form-control" name="name" id="name" placeholder="e.g., RAMESH R"
+            value="<%= formData.name || '' %>" required />
+          <small class="text-muted mt-1 d-block" style="font-size: 0.85rem;">
+            Student name should be in capital letters with the initial at the end (e.g., RAMESH R).
+          </small>
         </div>
 
         <!-- Roll No -->
@@ -126,16 +130,23 @@
 
         <!-- Relation -->
         <div class="mb-3">
-          <label class="form-label">S/o or D/o *</label>
-          <div class="sod-field">
-            <select class="form-select" name="relation" id="relation" required>
-              <option value="" disabled <%=!formData.relation ? 'selected' : '' %>>Select</option>
-              <option value="S/o" <%=formData.relation==='S/o' ? 'selected' : '' %>>S/o</option>
-              <option value="D/o" <%=formData.relation==='D/o' ? 'selected' : '' %>>D/o</option>
-            </select>
-            <input type="text" class="form-control" name="parentName" placeholder="Parent's Name"
-              value="<%= formData.parentName || '' %>" required />
-          </div>
+          <label for="relation" class="form-label">S/o or D/o *</label>
+          <select class="form-select" name="relation" id="relation" required>
+            <option value="" disabled <%=!formData.relation ? 'selected' : '' %>>Select</option>
+            <option value="S/o" <%=formData.relation==='S/o' ? 'selected' : '' %>>S/o</option>
+            <option value="D/o" <%=formData.relation==='D/o' ? 'selected' : '' %>>D/o</option>
+          </select>
+        </div>
+
+        <!-- Parent Name -->
+        <div class="mb-3">
+          <label for="parentName" class="form-label">Parent's Name (including initial) *</label>
+          <input type="text" class="form-control" name="parentName" id="parentName" placeholder="e.g., R. Ramesh"
+            value="<%= formData.parentName || '' %>" required />
+          <small class="text-muted mt-1 d-block" style="font-size: 0.85rem;">
+            Father's name initial should be in capital letter, father name should be in lowercase except the first
+            letter and initial letter. (e.g., R. Ramesh)
+          </small>
         </div>
 
         <!-- Year + Course -->

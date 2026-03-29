@@ -30,8 +30,8 @@ exports.postForm = (req, res) => {
   try {
     const now = new Date();
     const currentYear = now.getFullYear();
-    const nextYear = currentYear + 1;
-    const academicYear = `${currentYear}-${nextYear}`;
+    const month = now.getMonth();
+    const academicYear = month < 5 ? `${currentYear - 1} - ${currentYear}` : `${currentYear} - ${currentYear + 1}`;
 
     // If Custom is selected, use the custom input value as certificateFor
     let certificateFor = req.body.certificateFor;
@@ -42,8 +42,8 @@ exports.postForm = (req, res) => {
 
     // Auto-set today's date (YYYY-MM-DD)
     const day = String(now.getDate()).padStart(2, '0');
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const todayDate = `${currentYear}-${month}-${day}`;
+    const displayMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const todayDate = `${currentYear}-${displayMonth}-${day}`;
 
     const formData = {
       title: req.body.title,
@@ -77,12 +77,13 @@ exports.confirmForm = async (req, res) => {
   try {
     const now = new Date();
     const currentYear = now.getFullYear();
-    const nextYear = currentYear + 1;
-    finalData.academicYear = `${currentYear}-${nextYear}`;
+    const month = now.getMonth();
+    
+    finalData.academicYear = month < 5 ? `${currentYear - 1} - ${currentYear}` : `${currentYear} - ${currentYear + 1}`;
     finalData.cYear = currentYear;
 
     finalData.name = finalData.name.toUpperCase();
-    finalData.parentName = finalData.parentName.toUpperCase();
+    // finalData.parentName = finalData.parentName.toUpperCase(); // Removed as per user request to preserve case
 
     // Determine him/her based on title
     finalData.himHer = getHimHerFromTitle(finalData.title);
@@ -99,9 +100,8 @@ exports.confirmForm = async (req, res) => {
 
     // Create filename with .docx extension
     const day = String(now.getDate()).padStart(2, '0');
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = now.getFullYear();
-    const fileName = `${day}-${month}-${year}-bonafide-certificate-${finalData.rollno}.docx`;
+    const displayMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const fileName = `${day}-${displayMonth}-${currentYear}-bonafide-certificate-${finalData.rollno}.docx`;
 
     // Send email with DOCX attachment
     //await sendBonafideNotification(finalData, buffer, fileName);

@@ -20,10 +20,10 @@ exports.downloadDocx = async (req, res) => {
     const getHimHer = (title) => {
       if (!title) return 'him/her';
       const lowerTitle = title.toLowerCase();
-      if (lowerTitle.includes('miss') || lowerTitle.includes('ms.') || lowerTitle.includes('mrs.')) {
+      if (lowerTitle.includes('miss') || lowerTitle === 'ms' || lowerTitle.includes('mrs.')) {
         return 'her';
       }
-      if (lowerTitle.includes('mr.')) {
+      if (lowerTitle === 'mr') {
         return 'him';
       }
       return 'him/her';
@@ -32,16 +32,26 @@ exports.downloadDocx = async (req, res) => {
     const formData = {
       title: (rawData.title || '').toString(),
       name: (rawData.name || '').toString().toUpperCase(),
-      rollno: (rawData.rollno || '').toString(),
+      rollno: (rawData.rollno || '').toString().toUpperCase(),
       relation: (rawData.relation || '').toString(),
-      parentName: (rawData.parentName || '').toString().toUpperCase(),
+      parentName: (rawData.parentName || '').toString(),
       year: (rawData.year || '').toString(),
-      course: (rawData.course || '').toString(),
+      course: (rawData.course || '').toString().toUpperCase(),
       branch: (rawData.branch || '').toString(),
       certificateFor: (rawData.certificateFor || '').toString(),
       scholarshipType: (rawData.scholarshipType || '').toString(),
       date: (rawData.date || '').toString(),
-      academicYear: (rawData.academicYear || '').toString(),
+      academicYear: (() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0 is January
+        // If current month is before June (month 5), academic year is (year-1) - year
+        if (month < 5) {
+          return `${year - 1} - ${year}`;
+        }
+        // If current month is June or later, academic year is year - (year+1)
+        return `${year} - ${year + 1}`;
+      })(),
       cYear: (rawData.cYear || '').toString(),
       himHer: getHimHer(rawData.title)
     };

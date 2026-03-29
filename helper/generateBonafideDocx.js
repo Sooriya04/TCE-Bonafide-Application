@@ -115,13 +115,17 @@ async function generateBonafideDocx(formData) {
 
     doc.render(data);
 
-    // Post-process: make name, year, branch bold in the rendered XML
+    // Post-process: make specific fields bold in the rendered XML
     const renderedZip = doc.getZip();
     let docXml = renderedZip.file('word/document.xml').asText();
 
     docXml = makeBoldInXml(docXml, nameValue);
     docXml = makeBoldInXml(docXml, yearValue);
     docXml = makeBoldInXml(docXml, branchValue);
+    docXml = makeBoldInXml(docXml, data.title);
+    docXml = makeBoldInXml(docXml, data.rollno);
+    docXml = makeBoldInXml(docXml, data.course);
+    docXml = makeBoldInXml(docXml, data.academicYear);
 
     renderedZip.file('word/document.xml', docXml);
 
