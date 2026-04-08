@@ -159,21 +159,23 @@
               <option <%=formData.year==='II' ? 'selected' : '' %>>II</option>
               <option <%=formData.year==='III' ? 'selected' : '' %>>III</option>
               <option <%=formData.year==='IV' ? 'selected' : '' %>>IV</option>
+              <option <%=formData.year==='V' ? 'selected' : '' %>>V</option>
             </select>
           </div>
           <div class="mb-3 col-md-6">
             <label for="course" class="form-label">Course *</label>
             <select class="form-select" name="course" id="course" required>
               <option value="" disabled <%=!formData.course ? 'selected' : '' %>>Select</option>
-              <option <%=formData.course==='B.E' ? 'selected' : '' %>>B.E</option>
-              <option <%=formData.course==='B.Tech' ? 'selected' : '' %>>B.Tech</option>
-              <option <%=formData.course==='M.E' ? 'selected' : '' %>>M.E</option>
+              <option <%=formData.course==='B.E.' ? 'selected' : '' %>>B.E.</option>
+              <option <%=formData.course==='B.Tech.' ? 'selected' : '' %>>B.Tech.</option>
+              <option <%=formData.course==='M.E.' ? 'selected' : '' %>>M.E.</option>
               <option <%=formData.course==='MCA' ? 'selected' : '' %>>MCA</option>
-              <option <%=formData.course==='B.Arch' ? 'selected' : '' %>>B.Arch</option>
-              <option <%=formData.course==='M.Arch' ? 'selected' : '' %>>M.Arch</option>
-              <option <%=formData.course==='M.Plan' ? 'selected' : '' %>>M.Plan</option>
-              <option <%=formData.course==='Part Time B.E' ? 'selected' : '' %>>Part Time B.E</option>
-              <option <%=formData.course==='B.Des' ? 'selected' : '' %>>B.Des</option>
+              <option <%=formData.course==='B.Arch.' ? 'selected' : '' %>>B.Arch.</option>
+              <option <%=formData.course==='M.Arch.' ? 'selected' : '' %>>M.Arch.</option>
+              <option <%=formData.course==='M.Plan.' ? 'selected' : '' %>>M.Plan.</option>
+              <option <%=formData.course==='M.Sc.' ? 'selected' : '' %>>M.Sc.</option>
+              <option <%=formData.course==='Part Time B.E.' ? 'selected' : '' %>>Part Time B.E.</option>
+              <option <%=formData.course==='B.Des.' ? 'selected' : '' %>>B.Des.</option>
             </select>
           </div>
         </div>
@@ -185,11 +187,12 @@
             <option value="" disabled <%=!formData.branch ? 'selected' : '' %>>Select</option>
             <% [ "Architecture" , "Civil Engineering" , "Communication Systems" , "Computer Applications"
               , "Computer Science and Business Systems" , "Computer Science and Engineering"
-              , "Construction Engineering and Management" , "CSE(Artificial Intelligence and Machine Learning)"
-              , "Data Science (5 Years Integrated Course)" , "Electrical and Electronics Engineering"
-              , "Electronics and Communication Engineering" , "Information Technology" , "Interior Design"
-              , "Mechanical Engineering" , "Mechatronics" , "Planning" , "Structural Engineering"
-              ].forEach(function(branch){ %>
+              , "Computer Science and Engineering (AI & ML)" , "Construction Engineering and Management"
+              , "Data Science (5 Years Integrated Course)" , "Electrical and Computer Engineering"
+              , "Electrical and Electronics Engineering" , "Electronics and Communication Engineering"
+              , "Electronics Engineering (VLSI Design & Tech.)" , "Embedded System Technologies" , "Fashion Technology"
+              , "Information Technology" , "Interior Design" , "Mechanical Engineering" , "Mechatronics"
+              , "Structural Engineering" , "Urban Planning" ].forEach(function(branch){ %>
               <option value="<%= branch %>" <%=formData.branch===branch ? 'selected' : '' %>><%= branch %>
               </option>
               <% }) %>

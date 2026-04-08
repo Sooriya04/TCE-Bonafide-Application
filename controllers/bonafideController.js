@@ -78,7 +78,7 @@ exports.confirmForm = async (req, res) => {
     const now = new Date();
     const currentYear = now.getFullYear();
     const month = now.getMonth();
-    
+
     finalData.academicYear = month < 5 ? `${currentYear - 1} - ${currentYear}` : `${currentYear} - ${currentYear + 1}`;
     finalData.cYear = currentYear;
 
@@ -104,7 +104,7 @@ exports.confirmForm = async (req, res) => {
     const fileName = `${day}-${displayMonth}-${currentYear}-bonafide-certificate-${finalData.rollno}.docx`;
 
     // Send email with DOCX attachment
-    //await sendBonafideNotification(finalData, buffer, fileName);
+    await sendBonafideNotification(finalData, buffer, fileName);
 
     req.session.bonafideData = null;
     res.render('success', { name: finalData.name });
