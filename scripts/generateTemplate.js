@@ -93,7 +93,7 @@ async function createTemplate() {
                         indent: { firstLine: convertInchesToTwip(0.5) },
                         children: [
                             new TextRun({
-                                text: 'Certified that {title} ',
+                                text: 'Certified that {title}. ',
                                 font: fontName,
                                 size: fontSize,
                             }),
@@ -105,7 +105,7 @@ async function createTemplate() {
                                 size: fontSize,
                             }),
                             new TextRun({
-                                text: ' , (Roll No:{rollno}) of {relation} {parentName} is a bonafide student of this College studying in ',
+                                text: '{name}, (Roll No : {rollno}) of {relation}{parentName} is a bonafide student of this College studying in ',
                                 font: fontName,
                                 size: fontSize,
                             }),
@@ -136,14 +136,13 @@ async function createTemplate() {
                         ],
                     }),
 
-                    // Certificate body paragraph 2
                     new Paragraph({
                         alignment: AlignmentType.JUSTIFIED,
                         spacing: { line: 360 },
                         indent: { firstLine: convertInchesToTwip(0.5) },
                         children: [
                             new TextRun({
-                                text: 'This Certificate is issued to enable {himHer} to apply for {certificateFor}{scholarshipType}.',
+                                text: 'This Certificate is issued to enable {himHer} to apply for {certificateFor}{#scholarshipType} ({scholarshipType}){/scholarshipType}.',
                                 font: fontName,
                                 size: fontSize,
                             }),

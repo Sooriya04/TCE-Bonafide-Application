@@ -124,8 +124,11 @@
         <!-- Roll No -->
         <div class="mb-3">
           <label for="rollno" class="form-label">Roll No *</label>
-          <input type="text" class="form-control" name="rollno" id="rollno" value="<%= formData.rollno || '' %>"
-            required />
+          <input type="text" class="form-control" name="rollno" id="rollno" placeholder="e.g., 660000"
+            value="<%= formData.rollno || '' %>" required />
+          <small class="text-muted mt-1 d-block" style="font-size: 0.85rem;">
+            Please enter your Roll Number (e.g., 660000). Do not enter your Register Number.
+          </small>
         </div>
 
         <!-- Relation -->
@@ -133,8 +136,8 @@
           <label for="relation" class="form-label">S/o or D/o *</label>
           <select class="form-select" name="relation" id="relation" required>
             <option value="" disabled <%=!formData.relation ? 'selected' : '' %>>Select</option>
-            <option value="S/o" <%=formData.relation==='S/o' ? 'selected' : '' %>>S/o</option>
-            <option value="D/o" <%=formData.relation==='D/o' ? 'selected' : '' %>>D/o</option>
+            <option value="S/o " <%=formData.relation==='S/o ' ? 'selected' : '' %>>S/o </option>
+            <option value="D/o " <%=formData.relation==='D/o ' ? 'selected' : '' %>>D/o </option>
           </select>
         </div>
 
@@ -169,7 +172,7 @@
               <option <%=formData.course==='B.E.' ? 'selected' : '' %>>B.E.</option>
               <option <%=formData.course==='B.Tech.' ? 'selected' : '' %>>B.Tech.</option>
               <option <%=formData.course==='M.E.' ? 'selected' : '' %>>M.E.</option>
-              <option <%=formData.course==='MCA' ? 'selected' : '' %>>MCA</option>
+              <option <%=formData.course==='MCA.' ? 'selected' : '' %>>MCA.</option>
               <option <%=formData.course==='B.Arch.' ? 'selected' : '' %>>B.Arch.</option>
               <option <%=formData.course==='M.Arch.' ? 'selected' : '' %>>M.Arch.</option>
               <option <%=formData.course==='M.Plan.' ? 'selected' : '' %>>M.Plan.</option>
