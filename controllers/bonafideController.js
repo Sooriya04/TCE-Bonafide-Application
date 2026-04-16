@@ -1,4 +1,6 @@
 const { db } = require('../config/firebase');
+const generateBonafideDocx = require('../helper/generateBonafideDocx');
+const { sendBonafideNotification } = require('../helper/sendBonafideNotification');
 
 function getHimHerFromTitle(title) {
   if (!title) return 'him/her';
@@ -112,6 +114,23 @@ exports.confirmForm = async (req, res) => {
       himHer: himHer,
       createdAt: new Date(),
     });
+
+    // Send email notification to Admin asynchronously
+    try {
+      const gBuffer = await generateBonafideDocx(finalData);
+      const gNow = new Date();
+      const gDay = String(gNow.getDate()).padStart(2, '0');
+      const gMonth = String(gNow.getMonth() + 1).padStart(2, '0');
+      const gYear = gNow.getFullYear();
+      const gFileName = `${gDay}-${gMonth}-${gYear}-bonafide-certificate-${finalData.rollno}.docx`;
+
+      // Call it without 'await' to not block the user response, 
+      // but catch errors to log them
+      sendBonafideNotification(finalData, gBuffer, gFileName)
+        .catch(err => console.error('Background notification error:', err));
+    } catch (emailErr) {
+      console.error('Error preparing email notification:', emailErr);
+    }
 
     req.session.bonafideData = null;
     res.render('success', { name: finalData.name });

@@ -1,5 +1,5 @@
-const transporter = require('./transporter'); // your nodemailer transporter
-const ADMIN_EMAIL = process.env.AUTH_EMAIL;
+const transporter = require('./transporter');
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
 async function sendBonafideNotification(formData, fileBuffer, fileName) {
   try {
