@@ -1,8 +1,4 @@
 const { db } = require('../config/firebase');
-const {
-  sendBonafideNotification,
-} = require('../helper/sendBonafideNotification');
-const generateBonafideDocx = require('../helper/generateBonafideDocx');
 
 function getHimHerFromTitle(title) {
   if (!title) return 'him/her';
@@ -82,29 +78,40 @@ exports.confirmForm = async (req, res) => {
     finalData.academicYear = month < 5 ? `${currentYear - 1} - ${currentYear}` : `${currentYear} - ${currentYear + 1}`;
     finalData.cYear = currentYear;
 
-    finalData.name = finalData.name.toUpperCase();
-    // finalData.parentName = finalData.parentName.toUpperCase(); // Removed as per user request to preserve case
+    // Duplicate prevention: Use a deterministic Document ID (Idempotency Key)
+    // ID format: ROLLNO_PURPOSE_DATE
+    const sanitizedPurpose = finalData.certificateFor.replace(/[^a-zA-Z0-9]/g, '_');
+    const docId = `${finalData.rollno}_${sanitizedPurpose}_${finalData.date}`;
 
     // Determine him/her based on title
-    finalData.himHer = getHimHerFromTitle(finalData.title);
+    const himHer = getHimHerFromTitle(finalData.title);
 
-    // Save to Firebase
-    await db.collection('bonafideForms').add({
+    // 5-minute cooldown check
+    const docRef = db.collection('bonafideForms').doc(docId);
+    const docSnap = await docRef.get();
+
+    if (docSnap.exists) {
+      const existingData = docSnap.data();
+      const lastCreatedAt = existingData.createdAt.toDate();
+      const diffMs = Date.now() - lastCreatedAt.getTime();
+      const diffMins = diffMs / 60000;
+
+      if (diffMins < 5) {
+        const waitMins = Math.ceil(5 - diffMins);
+        console.log(`Cooldown active for ${finalData.rollno}. Wait ${waitMins} more minutes.`);
+        return res.render('preview', { 
+          formData: finalData, 
+          errorMessage: `You recently submitted this request. Please wait for ${waitMins} more minute(s) before trying again.` 
+        });
+      }
+    }
+
+    // Save to Firebase (using .set() to overwrite/update instead of creating duplicates)
+    await docRef.set({
       ...finalData,
-      himHer: finalData.himHer, // Save it to database too
+      himHer: himHer,
       createdAt: new Date(),
     });
-
-    // Generate DOCX buffer
-    const buffer = await generateBonafideDocx(finalData);
-
-    // Create filename with .docx extension
-    const day = String(now.getDate()).padStart(2, '0');
-    const displayMonth = String(now.getMonth() + 1).padStart(2, '0');
-    const fileName = `${day}-${displayMonth}-${currentYear}-bonafide-certificate-${finalData.rollno}.docx`;
-
-    // Send email with DOCX attachment
-    await sendBonafideNotification(finalData, buffer, fileName);
 
     req.session.bonafideData = null;
     res.render('success', { name: finalData.name });

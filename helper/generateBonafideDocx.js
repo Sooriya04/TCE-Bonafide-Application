@@ -31,13 +31,23 @@ async function generateBonafideDocx(formData) {
 
     const scholarshipType = formData.scholarshipType ? formData.scholarshipType.trim() : '';
 
-    const nameValue = sanitizeForDocx(formData.name).replace(/\.+$/, "").trim();
+    const titleValue = sanitizeForDocx(formData.title);
+    const titleWithDot = titleValue && !titleValue.endsWith('.') ? `${titleValue}.` : titleValue;
+
+    let finalName = sanitizeForDocx(formData.name).replace(/\.+$/, "").trim();
+    // If the name already starts with "Mr. " or "Ms. ", strip it for the template 
+    // because the template likely has a separate {title} placeholder.
+    const prefix = `${titleWithDot} `;
+    if (finalName.startsWith(prefix)) {
+      finalName = finalName.replace(prefix, "");
+    }
+
     const yearValue = sanitizeForDocx(formData.year);
     const branchValue = sanitizeForDocx(formData.branch);
 
     const data = {
-      title: sanitizeForDocx(formData.title),
-      name: nameValue,
+      title: titleWithDot,
+      name: finalName,
       rollno: sanitizeForDocx(formData.rollno),
       relation: sanitizeForDocx(formData.relation),
       parentName: sanitizeForDocx(formData.parentName),

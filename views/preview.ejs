@@ -93,10 +93,70 @@
       background-color: #660000;
       color: white;
     }
+
+    /* Toast Notification Styles */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    .toast-card {
+      background: white;
+      border-left: 5px solid #800000;
+      color: #333;
+      padding: 15px 25px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      margin-bottom: 15px;
+      min-width: 280px;
+      max-width: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: auto;
+      animation: slideIn 0.3s ease forwards, fadeOut 0.3s ease 4.7s forwards;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes fadeOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+
+    @media (max-width: 576px) {
+      .form-card {
+        padding: 1.5rem 1rem;
+        border-radius: 15px;
+        margin-top: 20px;
+        width: 95%;
+        max-width: none;
+      }
+      #toast-container {
+        right: 10px;
+        left: 10px;
+        top: 10px;
+      }
+      .toast-card {
+        min-width: auto;
+        width: 100%;
+      }
+    }
   </style>
 </head>
 
 <body>
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
   <header>
     <img src="/images/tce_logo.png" alt="TCE Logo" />
   </header>
@@ -132,11 +192,38 @@
           </p>
     </div>
 
-    <form action="/bonafide/confirm" method="POST" class="mt-3">
-      <button type="submit" class="btn btn-confirm">Confirm</button>
+    <form id="confirmForm" action="/bonafide/confirm" method="POST" class="mt-3">
+      <button type="submit" id="confirmBtn" class="btn btn-confirm">Confirm</button>
       <a href="/bonafide" class="btn btn-edit">Edit</a>
     </form>
   </div>
+
+  <script>
+    const form = document.getElementById('confirmForm');
+    const btn = document.getElementById('confirmBtn');
+
+    form.addEventListener('submit', () => {
+      btn.disabled = true;
+      btn.textContent = 'Confirming...';
+    });
+
+    function showToast(message) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast-card';
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 5000);
+    }
+
+    // Handle cooldown error message ("pop")
+    <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
+      showToast('<%= errorMessage %>');
+      // Re-enable button if it was disabled by a previous click
+      btn.disabled = false;
+      btn.textContent = 'Confirm';
+    <% } %>
+  </script>
 </body>
 
 </html>

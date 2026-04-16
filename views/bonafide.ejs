@@ -83,10 +83,78 @@
     .btn-maroon:hover {
       background-color: #660000 !important;
     }
+
+    /* Toast Notification Styles */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    .toast-card {
+      background: white;
+      border-left: 5px solid #800000;
+      color: #333;
+      padding: 15px 25px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      margin-bottom: 15px;
+      min-width: 280px;
+      max-width: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: auto;
+      animation: slideIn 0.3s ease forwards, fadeOut 0.3s ease 4.7s forwards;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes fadeOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+
+    /* Mobile Responsiveness Overrides */
+    @media (max-width: 576px) {
+      header {
+        padding: 10px 15px;
+        justify-content: center;
+      }
+      header img {
+        width: 220px;
+      }
+      .form-card {
+        padding: 1.5rem 1rem;
+        border-radius: 15px;
+        margin-top: 20px;
+      }
+      .btn-maroon {
+        width: 100% !important;
+      }
+      #toast-container {
+        right: 10px;
+        left: 10px;
+        top: 10px;
+      }
+      .toast-card {
+        min-width: auto;
+        width: 100%;
+      }
+    }
   </style>
 </head>
 
 <body>
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
   <header>
     <img src="/images/tce_logo.png" alt="TCE Logo" />
   </header>
@@ -117,7 +185,8 @@
           <input type="text" class="form-control" name="name" id="name" placeholder="e.g., RAMESH R"
             value="<%= formData.name || '' %>" required />
           <small class="text-muted mt-1 d-block" style="font-size: 0.85rem;">
-            Student name should be in capital letters with the initial at the end (e.g., RAMESH R).
+            Enter your name with the initial at the end (e.g., RAMESH R). The prefix Mr/Ms will be added automatically
+            based on your selection.
           </small>
         </div>
 
@@ -147,8 +216,7 @@
           <input type="text" class="form-control" name="parentName" id="parentName" placeholder="e.g., R. Ramesh"
             value="<%= formData.parentName || '' %>" required />
           <small class="text-muted mt-1 d-block" style="font-size: 0.85rem;">
-            Father's name initial should be in capital letter, father name should be in lowercase except the first
-            letter and initial letter. (e.g., R. Ramesh)
+            Parent's name initial should come first followed by the name (e.g., R. Ramesh).
           </small>
         </div>
 
@@ -169,16 +237,16 @@
             <label for="course" class="form-label">Course *</label>
             <select class="form-select" name="course" id="course" required>
               <option value="" disabled <%=!formData.course ? 'selected' : '' %>>Select</option>
-              <option <%=formData.course==='B.E.' ? 'selected' : '' %>>B.E.</option>
-              <option <%=formData.course==='B.Tech.' ? 'selected' : '' %>>B.Tech.</option>
-              <option <%=formData.course==='M.E.' ? 'selected' : '' %>>M.E.</option>
-              <option <%=formData.course==='MCA.' ? 'selected' : '' %>>MCA.</option>
-              <option <%=formData.course==='B.Arch.' ? 'selected' : '' %>>B.Arch.</option>
-              <option <%=formData.course==='M.Arch.' ? 'selected' : '' %>>M.Arch.</option>
-              <option <%=formData.course==='M.Plan.' ? 'selected' : '' %>>M.Plan.</option>
-              <option <%=formData.course==='M.Sc.' ? 'selected' : '' %>>M.Sc.</option>
-              <option <%=formData.course==='Part Time B.E.' ? 'selected' : '' %>>Part Time B.E.</option>
-              <option <%=formData.course==='B.Des.' ? 'selected' : '' %>>B.Des.</option>
+              <option <%=formData.course==='B.E' ? 'selected' : '' %>>B.E</option>
+              <option <%=formData.course==='B.Tech' ? 'selected' : '' %>>B.Tech</option>
+              <option <%=formData.course==='M.E' ? 'selected' : '' %>>M.E</option>
+              <option <%=formData.course==='MCA' ? 'selected' : '' %>>MCA</option>
+              <option <%=formData.course==='B.Arch' ? 'selected' : '' %>>B.Arch</option>
+              <option <%=formData.course==='M.Arch' ? 'selected' : '' %>>M.Arch</option>
+              <option <%=formData.course==='M.Plan' ? 'selected' : '' %>>M.Plan</option>
+              <option <%=formData.course==='M.Sc' ? 'selected' : '' %>>M.Sc</option>
+              <option <%=formData.course==='Part Time B.E' ? 'selected' : '' %>>Part Time B.E</option>
+              <option <%=formData.course==='B.Des' ? 'selected' : '' %>>B.Des</option>
             </select>
           </div>
         </div>
@@ -259,6 +327,14 @@
           customInput.value = '';
         }
       });
+    function showToast(message) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast-card';
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 5000);
+    }
   </script>
 </body>
 

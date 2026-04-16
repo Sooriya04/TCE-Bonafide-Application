@@ -9,8 +9,12 @@
       rel="stylesheet"
     />
     <link
-      href="https://fonts.googleapis.com/css2?family=Comic+Neue&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap"
       rel="stylesheet"
+    />
+    <link 
+      rel="stylesheet" 
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
     />
 
     <style>
@@ -22,7 +26,7 @@
 
       body {
         background-color: #fffdf5;
-        font-family: 'Arial', cursive;
+        font-family: 'Montserrat', sans-serif;
         display: flex;
         flex-direction: column;
       }
@@ -43,62 +47,82 @@
 
       @media screen and (max-width: 768px) {
         header img {
-          width: 200px;
+          width: 220px;
         }
       }
 
-      @media screen and (max-width: 480px) {
-        header img {
-          width: 160px;
-        }
-      }
-
-      /* Center content container */
       .content-wrapper {
         flex: 1;
         display: flex;
         justify-content: center;
         align-items: center;
+        padding: 20px;
       }
 
-      /* Card styling */
       .form-card {
         background: white;
         border-radius: 20px;
         max-width: 420px;
         width: 100%;
-        padding: 2.5rem 2rem;
+        padding: 3rem 2rem;
         text-align: center;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        border: none;
+      }
+
+      .success-icon {
+        font-size: 4rem;
+        color: #00a65a;
+        margin-bottom: 20px;
+        animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+
+      @keyframes bounceIn {
+        from { opacity: 0; transform: scale(0.3); }
+        to { opacity: 1; transform: scale(1); }
       }
 
       .title {
         color: #800000;
         font-size: 1.8rem;
-        font-weight: bold;
+        font-weight: 700;
         margin-bottom: 0.5rem;
       }
 
-      .subtitle {
-        color: #a05252;
+      .student-name {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 15px;
+        display: block;
+      }
+
+      .instructions {
+        color: #666;
         font-size: 1rem;
-        margin-bottom: 1.2rem;
+        margin-bottom: 2rem;
+        line-height: 1.5;
       }
 
       .btn-action {
         background-color: #800000;
         color: white;
         border: none;
-        border-radius: 20px;
-        padding: 10px;
+        border-radius: 25px;
+        padding: 12px 30px;
         font-size: 1.1rem;
+        font-weight: 600;
         width: 100%;
-        margin-top: 10px;
+        transition: 0.3s;
+        text-decoration: none;
+        display: block;
       }
 
       .btn-action:hover {
         background-color: #660000;
         color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(128, 0, 0, 0.3);
       }
     </style>
   </head>
@@ -109,9 +133,16 @@
 
     <div class="content-wrapper">
       <div class="card form-card">
-        <h2 class="title">Form Confirmed</h2>
-        <p><%= name %> visit office room for more details</p>
-        <a href="/logout" class="btn btn-action">Go to Login</a>
+        <div class="success-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h2 class="title text-uppercase mb-3">Request Confirmed</h2>
+        <span class="student-name"><%= name %></span>
+        <p class="instructions">
+          Your bonafide request has been successfully recorded.<br>
+          Please visit the <strong>office room</strong> for further details.
+        </p>
+        <a href="/logout" class="btn-action">Return to Login</a>
       </div>
     </div>
   </body>

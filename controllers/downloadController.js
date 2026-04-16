@@ -31,12 +31,12 @@ exports.downloadDocx = async (req, res) => {
 
     const formData = {
       title: (rawData.title || '').toString(),
-      name: (rawData.name || '').toString().toUpperCase(),
-      rollno: (rawData.rollno || '').toString().toUpperCase(),
+      name: (rawData.name || '').toString(),
+      rollno: (rawData.rollno || '').toString(),
       relation: (rawData.relation || '').toString(),
       parentName: (rawData.parentName || '').toString(),
       year: (rawData.year || '').toString(),
-      course: (rawData.course || '').toString().toUpperCase(),
+      course: (rawData.course || '').toString(),
       branch: (rawData.branch || '').toString(),
       certificateFor: (rawData.certificateFor || '').toString(),
       scholarshipType: (rawData.scholarshipType || '').toString(),

@@ -233,25 +233,95 @@
       opacity: 0.95;
     }
 
-    @media (max-width: 720px) {
+    /* Toast Notification Styles */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    .toast-card {
+      background: white;
+      border-left: 5px solid maroon;
+      color: #333;
+      padding: 15px 25px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      margin-bottom: 15px;
+      min-width: 280px;
+      max-width: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: auto;
+      animation: slideIn 0.3s ease forwards, fadeOut 0.3s ease 4.7s forwards;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes fadeOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+
+    @media (max-width: 768px) {
+      header {
+        padding: 10px 15px;
+        flex-wrap: wrap;
+        gap: 15px;
+        justify-content: center;
+      }
+      .nav-links {
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+        gap: 15px;
+      }
       .search-bar {
-        padding: 0 12px;
+        padding: 0 15px;
+        flex-direction: column;
+        width: 100%;
       }
-
-      th,
-      td {
+      .search-bar input {
+        width: 100%;
+        min-width: 0;
+      }
+      .search-bar button, .search-bar .reset-btn {
+        width: 100%;
+        text-align: center;
+      }
+      th, td {
         font-size: 13px;
-        padding: 10px 8px;
+        padding: 8px 5px;
       }
-
-      header img {
-        width: 180px;
+      .downloadBtn {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+      #toast-container {
+        right: 10px;
+        left: 10px;
+        top: 10px;
+      }
+      .toast-card {
+        min-width: auto;
+        width: 100%;
       }
     }
   </style>
 </head>
 
 <body>
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
   <header>
     <img src="/images/tce_logo.png" alt="TCE Logo" />
     <div class="nav-links">
@@ -359,7 +429,7 @@
     document.querySelectorAll('.downloadBtn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const id = btn.dataset.id;
-        if (!id) return alert('No id found for this record.');
+        if (!id) return showToast('No id found for this record.');
 
         const originalText = btn.innerHTML;
         btn.disabled = true;
@@ -398,13 +468,22 @@
           }
         } catch (err) {
           console.error(err);
-          alert('❌ Error downloading file. See console for details.');
+          showToast('❌ Error downloading file.');
         } finally {
           btn.disabled = false;
           btn.innerHTML = originalText;
         }
       });
     });
+
+    function showToast(message) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast-card';
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 5000);
+    }
   </script>
 </body>
 
