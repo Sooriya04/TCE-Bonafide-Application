@@ -6,18 +6,24 @@ const path = require('path');
 let serviceAccount;
 
 try {
-    // Try the config folder (local dev)
-    serviceAccount = require('./serviceAccount.json');
-} catch (e) {
-    try {
-        // Try the root folder (Render Secret File with filename 'serviceAccount.json')
-        serviceAccount = require(path.join(process.cwd(), 'serviceAccount.json'));
-    } catch (e2) {
-        // Try environment variable as a fallback
-        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-            serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+        // 1. Explicit path (Best for VPS/bare-metal)
+        serviceAccount = require(path.isAbsolute(process.env.FIREBASE_SERVICE_ACCOUNT_PATH) 
+            ? process.env.FIREBASE_SERVICE_ACCOUNT_PATH 
+            : path.join(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH));
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        // 2. Direct JSON string (Best for Render/PaaS)
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } else {
+        // 3. File search (Local dev / Render Secret Files)
+        try {
+            serviceAccount = require('./serviceAccount.json');
+        } catch (e) {
+            serviceAccount = require(path.join(process.cwd(), 'serviceAccount.json'));
         }
     }
+} catch (error) {
+    console.warn("Could not load Firebase Service Account from any source.");
 }
 
 if (serviceAccount) {
