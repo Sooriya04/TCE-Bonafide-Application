@@ -5,7 +5,7 @@ async function generateBonafideExcel(filePath, start, end, data) {
   const worksheet = workbook.addWorksheet('Bonafide Report');
 
   // Main title
-  worksheet.mergeCells('A1:M1');
+  worksheet.mergeCells('');
   const titleCell = worksheet.getCell('A1');
   titleCell.value = 'Monthly Bonafide Report';
   titleCell.alignment = { horizontal: 'center' };
@@ -101,4 +101,46 @@ async function generateBonafideExcel(filePath, start, end, data) {
   return filePath;
 }
 
-module.exports = { generateBonafideExcel };
+async function getBonafideDataInRange(db, startStr, endStr) {
+  const snapshot = await db
+    .collection('bonafideForms')
+    .where('date', '>=', startStr)
+    .where('date', '<=', endStr)
+    .get();
+
+  if (snapshot.empty) return [];
+  return snapshot.docs.map(doc => doc.data());
+}
+
+/**
+ * High-level function to generate and send a report for a specific year and month
+ */
+async function runMonthlyReport(db, year, month) {
+  const { sendMonthlyReportEmail } = require('../helper/sendMonthlyReportEmail');
+  const path = require('path');
+  const fs = require('fs');
+
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const startStr = start.toISOString().split('T')[0];
+  const endStr = end.toISOString().split('T')[0];
+
+  const reportsDir = path.join(__dirname, '../reports');
+  if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir);
+
+  const filePath = path.join(reportsDir, `Monthly_Report_${month}_${year}.xlsx`);
+  
+  const students = await getBonafideDataInRange(db, startStr, endStr);
+  
+  if (students.length === 0) {
+    throw new Error(`No data found for ${year}-${month}`);
+  }
+
+  await generateBonafideExcel(filePath, start, end, students);
+  await sendMonthlyReportEmail(filePath, start, end);
+  
+  return filePath;
+}
+
+module.exports = { generateBonafideExcel, getBonafideDataInRange, runMonthlyReport };
