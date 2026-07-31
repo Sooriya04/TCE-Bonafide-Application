@@ -1,29 +1,46 @@
 const cron = require('node-cron');
-const { runMonthlyReport } = require('../utils/monthlyReport');
-const { db } = require('../config/firebase');
+const replicaDb = require('../db/replica');
+const { generateBonafideExcel } = require('../utils/monthlyReport');
+const { sendMonthlyReportEmail } = require('../helper/sendMonthlyReportEmail');
+const path = require('path');
+const fs = require('fs');
 
-function scheduleMonthlyReportJob() {
-  // Run on the 1st of every month at 00:05 AM
-  cron.schedule('5 0 1 * *', async () => {
-    console.log('Running monthly bonafide report job...');
+const scheduleMonthlyReportJob = () => {
+  cron.schedule('0 0 1 * *', async () => {
+    console.log('Running monthly report generation job...');
     try {
       const now = new Date();
-      // Month is 1-indexed, but Date.getMonth() is 0-indexed.
-      // We want to report on the month that JUST ended.
-      let year = now.getFullYear();
-      let month = now.getMonth(); // This gives us previous month index (0-11)
-      
-      if (month === 0) { // If it's January, we want December of previous year
-        month = 12;
-        year -= 1;
-      }
+      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
 
-      await runMonthlyReport(db, year, month);
-      console.log(`Monthly report for ${year}-${month} generated and sent to admin.`);
+      // Query replica for records in that range
+      const result = await replicaDb.query(
+        'SELECT form_data FROM bonafide_forms WHERE created_at BETWEEN $1 AND $2 ORDER BY created_at ASC',
+        [firstDayLastMonth, lastDayLastMonth]
+      );
+
+      const allForms = result.rows.map(row => row.form_data);
+
+      if (allForms.length > 0) {
+        const reportsDir = path.join(__dirname, '../../reports');
+        if (!fs.existsSync(reportsDir)) {
+          fs.mkdirSync(reportsDir, { recursive: true });
+        }
+
+        const month = String(firstDayLastMonth.getMonth() + 1).padStart(2, '0');
+        const year = firstDayLastMonth.getFullYear();
+        const filePath = path.join(reportsDir, `Monthly_Report_${month}_${year}.xlsx`);
+
+        await generateBonafideExcel(filePath, firstDayLastMonth, lastDayLastMonth, allForms);
+        await sendMonthlyReportEmail(filePath, firstDayLastMonth, lastDayLastMonth);
+        console.log('Monthly report job completed successfully.');
+      } else {
+        console.log('No forms found for the previous month. Skipping report.');
+      }
     } catch (err) {
       console.error('Monthly report job failed:', err.message);
     }
   });
-}
+};
 
 module.exports = { scheduleMonthlyReportJob };

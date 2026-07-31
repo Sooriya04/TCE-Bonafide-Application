@@ -1,14 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const bonafideController = require('../controllers/bonafideController');
-const isAuthenticated = require('../middleware/authMiddleware');
+const bonafideCtrl = require('../controllers/bonafideController');
+const { checkAuth, checkAdmin } = require('../middleware/authMiddleware');
 
-router.get('/', isAuthenticated, bonafideController.getForm);
-
-// Preview route
-router.post('/preview', isAuthenticated, bonafideController.postForm);
-
-// Confirm route
-router.post('/confirm', isAuthenticated, bonafideController.confirmForm);
+router.post('/submit', checkAuth, bonafideCtrl.submitForm);
+router.get('/admin/forms', checkAdmin, bonafideCtrl.getAdminForms);
+router.patch('/admin/forms/:id/downloaded', checkAdmin, bonafideCtrl.toggleDownloaded);
+router.get('/download/:id', checkAuth, bonafideCtrl.downloadDocx);
 
 module.exports = router;

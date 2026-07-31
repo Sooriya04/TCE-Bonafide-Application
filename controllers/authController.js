@@ -1,350 +1,158 @@
-const {
-  hashPassword,
-  comparePassword,
-  generateTokenAndHash,
-  compareToken,
-} = require('../utils/tokenUtils');
-const {
-  sendVerificationEmail,
-  sendPasswordResetEmail,
-} = require('../helper/emailHelper');
-const {
-  findUserByEmail,
-  findPendingUsersByEmail,
-  addPendingUser,
-  addUser,
-  deletePendingUser,
-} = require('../functions/authFuntions');
-const { getAuth } = require('firebase-admin/auth');
-const { db } = require('../config/firebase');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
+const redisClient = require('../cache/redis');
+const replicaDb = require('../db/replica');
+const primaryDb = require('../db/primary');
+const { sendVerificationEmail } = require('../helper/emailHelper');
 
-const showSignup = (req, res) => {
-  res.render('signup', { error: null, message: null });
-};
-
-const showLogin = (req, res) => {
-  res.render('login', { error: null, message: null });
-};
-
-// =====================
-// Signup
-// =====================
-const signup = async (req, res) => {
-  const { name, email, password } = req.body || {};
-
-  if (!name || !email || !password) {
-    return res.render('signup', {
-      error: 'Input Error',
-      message: 'Please fill all the fields.',
-    });
-  }
-  try {
-    // Already registered?
-    const existingUser = await findUserByEmail(email);
-    if (existingUser) {
-      return res.render('signup', {
-        error: 'Email Error',
-        message: 'This email is already registered.',
-      });
-    }
-
-    // Clean old pending requests
-    const oldPending = await findPendingUsersByEmail(email);
-    if (oldPending.length > 0) {
-      const batch = db.batch();
-      oldPending.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
-    }
-
-    // Create new pending signup
-    const passwordHash = await hashPassword(password);
-    const { token, tokenHash } = await generateTokenAndHash();
-    const expireAt = new Date(Date.now() + 6 * 60 * 60 * 1000); // 6h validity
-
-    await addPendingUser(name, email, passwordHash, tokenHash, expireAt);
-    await sendVerificationEmail(email, token);
-
-    return res.render('verifyNotice', { email, error: null, message: null });
-  } catch (err) {
-    console.error('Signup error:', err);
-    return res.render('signup', {
-      error: 'Signup Error',
-      message: 'Signup failed. Please try again later.',
-    });
-  }
-};
-
-// =====================
-// Verify Email
-// =====================
-const verify = async (req, res) => {
-  const { email, token } = req.query || {};
-
-  if (!email || !token) {
-    return res.render('verificationfailed', { message: 'Missing parameters.' });
-  }
-
-  try {
-    const pendingUsers = await findPendingUsersByEmail(email);
-    if (pendingUsers.length === 0) {
-      return res.render('verificationfailed', {
-        message: 'Invalid or already used verification link.',
-      });
-    }
-
-    // Get latest pending signup
-    const latestDoc = pendingUsers.reduce((latest, doc) => {
-      const createdAt = doc.data().createdAt.toDate().getTime();
-      return createdAt > (latest?.data()?.createdAt?.toDate()?.getTime() || 0)
-        ? doc
-        : latest;
-    }, null);
-
-    const data = latestDoc.data();
-
-    // Expired?
-    if (new Date() > data.expireAt.toDate()) {
-      await deletePendingUser(latestDoc.ref);
-      return res.render('verificationfailed', {
-        message: 'Verification link expired. Please sign up again.',
-      });
-    }
-
-    // Token check
-    const tokenMatches = await compareToken(token, data.tokenHash);
-    if (!tokenMatches) {
-      return res.render('verificationfailed', {
-        message: 'Invalid verification token.',
-      });
-    }
-
-    // Move to permanent users
-    await addUser(data.name, email, data.passwordHash);
-    await deletePendingUser(latestDoc.ref);
-
-    return res.render('verifySuccess', {
-      message: 'Email verified successfully! You can now log in.',
-    });
-  } catch (err) {
-    console.error('Verification error:', err);
-    return res.render('verificationfailed', {
-      message: 'Verification failed. Please try again.',
-    });
-  }
-};
-
-const login = async (req, res) => {
-  const { email, password } = req.body || {};
-
-  if (!email || !password) {
-    return res.render('login', {
-      error: 'All fields are required',
-      message: null,
-    });
-  }
-
-  try {
-    const userDoc = await findUserByEmail(email);
-
-    if (!userDoc) {
-      const pending = await findPendingUsersByEmail(email);
-      if (pending.length > 0) {
-        return res.render('verifyNotice', {
-          email,
-          error: null,
-          message: null,
-        });
-      }
-      return res.render('login', {
-        error: 'User not found',
-        message: null,
-      });
-    }
-
-    const user = userDoc.data();
-
-    // Password check
-    const valid = await comparePassword(password, user.password);
-    if (!valid) {
-      return res.render('login', {
-        error: 'Incorrect password',
-        message: null,
-      });
-    }
-
-    // Session setup
-    req.session.user = { email: user.email, name: user.name };
-    req.session.message = `Welcome ${user.name || user.email}`;
-
-    return res.redirect('/bonafide');
-  } catch (err) {
-    console.error('Login error:', err);
-    return res.render('login', {
-      error: 'Login failed',
-      message: null,
-    });
-  }
-};
-
-// =====================
-// Google Login
-// =====================
-const googleLogin = async (req, res) => {
-  try {
-    const { idToken } = req.body;
-    if (!idToken) {
-      return res.json({ success: false, message: 'No ID token provided' });
-    }
-
-    const decodedToken = await getAuth().verifyIdToken(idToken);
-    const email = decodedToken.email;
-    const name = decodedToken.name || email.split('@')[0];
-
-    // No domain restriction — allow any email
-    let userDoc = await findUserByEmail(email);
-    if (!userDoc) {
-      // create user without password (OAuth)
-      await addUser(name, email, null);
-    }
-
-    req.session.user = { email, name };
-    req.session.message = `Welcome ${name}`;
-
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('Google login error:', err);
-    return res.json({ success: false, message: 'Google login failed' });
-  }
-};
-
-const forgotPassword = async (req, res) => {
-  const { email } = req.body || {};
+const requestOTP = async (req, res) => {
+  const { email } = req.body;
   if (!email) {
-    return res.render('forgot-password', {
-      error: 'Email required',
-      message: null,
-    });
+    return res.status(400).json({ error: 'Email is required' });
   }
 
   try {
-    const userDoc = await findUserByEmail(email);
-    if (!userDoc) {
-      return res.render('forgot-password', {
-        error: 'User not found',
-        message: null,
-      });
+    // 1. Look up student email in database
+    const userRes = await replicaDb.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]);
+    let user = userRes.rows[0];
+
+    // If student doesn't exist, we auto-create the student (since continue with google registration is gone)
+    if (!user) {
+      const nameFromEmail = email.split('@')[0].toUpperCase();
+      const insertRes = await primaryDb.query(
+        'INSERT INTO users (name, email, verified) VALUES ($1, $2, true) RETURNING *',
+        [nameFromEmail, email]
+      );
+      user = insertRes.rows[0];
     }
 
-    const { token, tokenHash } = await generateTokenAndHash();
-    const expireAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    // 2. Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const saltRounds = 10;
+    const otpHash = await bcrypt.hash(otp, saltRounds);
 
-    await userDoc.ref.update({
-      resetTokenHash: tokenHash,
-      resetTokenExpiry: expireAt,
-    });
+    // 3. Store OTP in Redis (10 minutes TTL)
+    await redisClient.set(`otp:${email}`, otpHash, 'EX', 600);
 
-    await sendPasswordResetEmail(email, token);
-    return res.render('message', {
-      message: 'Password reset link sent to your email.',
-    });
+    // 4. Send Email
+    await sendVerificationEmail(email, otp);
+
+    return res.json({ success: true, message: 'OTP sent to email successfully.' });
   } catch (err) {
-    console.error('Forgot password error:', err);
-    return res.render('forgot-password', {
-      error: 'Something went wrong',
-      message: null,
-    });
+    req.log.error('OTP Request Error', { error: err.message });
+    return res.status(500).json({ error: 'Failed to send OTP.' });
   }
 };
 
-// =====================
-// Show Reset Form
-// =====================
-const showResetForm = async (req, res) => {
-  const { email, token } = req.query || {};
-  if (!email || !token) {
-    return res.render('message', { message: 'Invalid reset link' });
+const verifyOTP = async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    return res.status(400).json({ error: 'Email and OTP are required' });
   }
 
   try {
-    const userDoc = await findUserByEmail(email);
-    if (!userDoc) {
-      return res.render('message', { message: 'Invalid reset link' });
-    }
-    const data = userDoc.data();
+    const redisKey = `otp:${email}`;
+    const storedHash = await redisClient.get(redisKey);
 
-    if (!data.resetTokenHash || !data.resetTokenExpiry) {
-      return res.render('message', { message: 'No reset request found' });
+    if (!storedHash) {
+      return res.status(400).json({ error: 'OTP expired or not found. Please request a new one.' });
     }
 
-    if (new Date() > data.resetTokenExpiry.toDate()) {
-      return res.render('message', { message: 'Reset link expired' });
+    // Validate limit of wrong attempts via Redis counter
+    const attemptsKey = `otp_attempts:${email}`;
+    const attempts = await redisClient.incr(attemptsKey);
+    await redisClient.expire(attemptsKey, 600);
+
+    if (attempts > 3) {
+      await redisClient.del(redisKey);
+      await redisClient.del(attemptsKey);
+      return res.status(400).json({ error: 'Too many incorrect attempts. OTP invalidated.' });
     }
 
-    const valid = await compareToken(token, data.resetTokenHash);
-    if (!valid) {
-      return res.render('message', { message: 'Invalid reset token' });
+    const matches = await bcrypt.compare(otp, storedHash);
+    if (!matches) {
+      return res.status(400).json({ error: 'Invalid OTP.' });
     }
 
-    return res.render('reset-password', { email, token, error: null });
+    // Clean up OTP & attempts keys
+    await redisClient.del(redisKey);
+    await redisClient.del(attemptsKey);
+
+    // Fetch user details for session payload
+    const userRes = await replicaDb.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]);
+    const user = userRes.rows[0];
+
+    req.session.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: 'student',
+    };
+
+    return res.json({ success: true, user: req.session.user });
   } catch (err) {
-    console.error('Show reset form error:', err);
-    return res.render('message', { message: 'Something went wrong' });
+    req.log.error('OTP Verification Error', { error: err.message });
+    return res.status(500).json({ error: 'Failed to verify OTP.' });
   }
 };
 
-// =====================
-// Handle Reset Password
-// =====================
-const resetPassword = async (req, res) => {
-  const { email, token, password } = req.body || {};
-  if (!email || !token || !password) {
-    return res.render('message', { message: 'Missing data' });
+const adminLogin = async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
   }
 
   try {
-    const userDoc = await findUserByEmail(email);
-    if (!userDoc) {
-      return res.render('message', { message: 'Invalid reset attempt' });
-    }
-    const data = userDoc.data();
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-    if (!data.resetTokenHash || !data.resetTokenExpiry) {
-      return res.render('message', { message: 'No reset request found' });
+    if (!adminEmail || !adminPasswordHash) {
+      req.log.error('Admin configuration missing in env credentials.');
+      return res.status(500).json({ error: 'Admin auth configuration error.' });
     }
 
-    if (new Date() > data.resetTokenExpiry.toDate()) {
-      return res.render('message', { message: 'Reset link expired' });
+    if (email !== adminEmail) {
+      return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
-    const valid = await compareToken(token, data.resetTokenHash);
+    const valid = await bcrypt.compare(password, adminPasswordHash);
     if (!valid) {
-      return res.render('message', { message: 'Invalid reset token' });
+      return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
-    const passwordHash = await hashPassword(password);
-    await userDoc.ref.update({
-      password: passwordHash,
-      resetTokenHash: null,
-      resetTokenExpiry: null,
-    });
+    req.session.user = {
+      email: adminEmail,
+      role: 'admin',
+      name: 'College Admin',
+    };
 
-    return res.render('message', {
-      message: 'Password reset successful. You can now login.',
-    });
+    return res.json({ success: true, user: req.session.user });
   } catch (err) {
-    console.error('Reset password error:', err);
-    return res.render('message', { message: 'Something went wrong' });
+    req.log.error('Admin Login Error', { error: err.message });
+    return res.status(500).json({ error: 'Internal server login error.' });
   }
+};
+
+const logout = (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Could not log out.' });
+    }
+    return res.json({ success: true });
+  });
+};
+
+const getMe = (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ user: null });
+  }
+  return res.json({ user: req.session.user });
 };
 
 module.exports = {
-  showSignup,
-  signup,
-  verify,
-  showLogin,
-  login,
-  googleLogin,
-  forgotPassword,
-  showResetForm,
-  resetPassword,
+  requestOTP,
+  verifyOTP,
+  adminLogin,
+  logout,
+  getMe,
 };

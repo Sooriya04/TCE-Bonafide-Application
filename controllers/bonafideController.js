@@ -1,141 +1,201 @@
-const { db } = require('../config/firebase');
+const primaryDb = require('../db/primary');
+const replicaDb = require('../db/replica');
+const redisClient = require('../cache/redis');
 const generateBonafideDocx = require('../helper/generateBonafideDocx');
 const { sendBonafideNotification } = require('../helper/sendBonafideNotification');
 
-function getHimHerFromTitle(title) {
-  if (!title) return 'him/her';
-
-  const lowerTitle = title.toLowerCase().trim();
-
-  if (lowerTitle.includes('mr.') || lowerTitle === 'mr' || lowerTitle.includes('shri') || lowerTitle.includes('sri')) {
-    return 'him';
+const submitForm = async (req, res) => {
+  const formData = req.body;
+  if (!formData.rollno || !formData.name || !formData.certificateFor) {
+    return res.status(400).json({ error: 'Roll No, Name, and Purpose are required fields.' });
   }
 
-  if (lowerTitle.includes('ms.') || lowerTitle.includes('mrs.') || lowerTitle.includes('miss') ||
-    lowerTitle === 'ms' || lowerTitle === 'mrs' || lowerTitle.includes('kumari') || lowerTitle.includes('smt')) {
-    return 'her';
-  }
-
-  return 'him/her';
-}
-
-exports.getForm = (req, res) => {
-  const formData = req.session.bonafideData || {};
-  res.render('bonafide', { formData });
-};
-
-exports.postForm = (req, res) => {
   try {
     const now = new Date();
     const currentYear = now.getFullYear();
     const month = now.getMonth();
     const academicYear = month < 5 ? `${currentYear - 1} - ${currentYear}` : `${currentYear} - ${currentYear + 1}`;
 
-    // If Custom is selected, use the custom input value as certificateFor
-    let certificateFor = req.body.certificateFor;
-    const customCertificateFor = req.body.customCertificateFor || '';
-    if (certificateFor === 'Custom' && customCertificateFor.trim()) {
-      certificateFor = customCertificateFor.trim();
-    }
-
-    // Auto-set today's date (YYYY-MM-DD)
     const day = String(now.getDate()).padStart(2, '0');
     const displayMonth = String(now.getMonth() + 1).padStart(2, '0');
     const todayDate = `${currentYear}-${displayMonth}-${day}`;
 
-    const formData = {
-      title: req.body.title,
-      name: req.body.name,
-      rollno: req.body.rollno,
-      relation: req.body.relation,
-      parentName: req.body.parentName,
-      year: req.body.year,
-      course: req.body.course,
-      branch: req.body.branch,
-      certificateFor,
-      customCertificateFor,
-      scholarshipType: req.body.scholarshipType || '',
+    // Compute title values
+    const lowerTitle = (formData.title || '').toLowerCase().trim();
+    let himHer = 'him/her';
+    if (lowerTitle.includes('mr') || lowerTitle.includes('shri')) {
+      himHer = 'him';
+    } else if (lowerTitle.includes('ms') || lowerTitle.includes('mrs') || lowerTitle.includes('miss')) {
+      himHer = 'her';
+    }
+
+    const fullData = {
+      ...formData,
       date: todayDate,
       academicYear,
-      cYear: currentYear
+      cYear: currentYear,
+      himHer,
     };
 
-    req.session.bonafideData = formData;
-    res.render('preview', { formData });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Error processing form');
-  }
-};
+    const sanitizedPurpose = (formData.certificateFor || 'Other').replace(/[^a-zA-Z0-9]/g, '_');
+    const docId = `${formData.rollno}_${sanitizedPurpose}_${todayDate}`;
 
-exports.confirmForm = async (req, res) => {
-  const finalData = req.session.bonafideData;
-  if (!finalData) return res.redirect('/bonafide');
-
-  try {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const month = now.getMonth();
-
-    finalData.academicYear = month < 5 ? `${currentYear - 1} - ${currentYear}` : `${currentYear} - ${currentYear + 1}`;
-    finalData.cYear = currentYear;
-
-    // Duplicate prevention: Use a deterministic Document ID (Idempotency Key)
-    // ID format: ROLLNO_PURPOSE_DATE
-    const sanitizedPurpose = finalData.certificateFor.replace(/[^a-zA-Z0-9]/g, '_');
-    const docId = `${finalData.rollno}_${sanitizedPurpose}_${finalData.date}`;
-
-    // Determine him/her based on title
-    const himHer = getHimHerFromTitle(finalData.title);
-
-    // 5-minute cooldown check
-    const docRef = db.collection('bonafideForms').doc(docId);
-    const docSnap = await docRef.get();
-
-    if (docSnap.exists) {
-      const existingData = docSnap.data();
-      const lastCreatedAt = existingData.createdAt.toDate();
+    // Cooldown check (5 minutes) from database
+    const existing = await replicaDb.query('SELECT created_at FROM bonafide_forms WHERE id = $1', [docId]);
+    if (existing.rows[0]) {
+      const lastCreatedAt = new Date(existing.rows[0].created_at);
       const diffMs = Date.now() - lastCreatedAt.getTime();
       const diffMins = diffMs / 60000;
 
       if (diffMins < 5) {
         const waitMins = Math.ceil(5 - diffMins);
-        console.log(`Cooldown active for ${finalData.rollno}. Wait ${waitMins} more minutes.`);
-        return res.render('preview', { 
-          formData: finalData, 
-          errorMessage: `You recently submitted this request. Please wait for ${waitMins} more minute(s) before trying again.` 
+        return res.status(429).json({
+          error: `You recently submitted this request. Please wait for ${waitMins} more minute(s) before trying again.`,
         });
       }
     }
 
-    // Save to Firebase (using .set() to overwrite/update instead of creating duplicates)
-    await docRef.set({
-      ...finalData,
-      himHer: himHer,
-      createdAt: new Date(),
-    });
+    // Save to PostgreSQL (using ON CONFLICT to act as idempotency safeguard)
+    await primaryDb.query(
+      `INSERT INTO bonafide_forms (id, form_data, created_at)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET
+         form_data = EXCLUDED.form_data,
+         created_at = EXCLUDED.created_at`,
+      [docId, JSON.stringify(fullData), now]
+    );
 
-    // Send email notification to Admin asynchronously
-    try {
-      const gBuffer = await generateBonafideDocx(finalData);
-      const gNow = new Date();
-      const gDay = String(gNow.getDate()).padStart(2, '0');
-      const gMonth = String(gNow.getMonth() + 1).padStart(2, '0');
-      const gYear = gNow.getFullYear();
-      const gFileName = `${gDay}-${gMonth}-${gYear}-bonafide-certificate-${finalData.rollno}.docx`;
-
-      // Call it without 'await' to not block the user response, 
-      // but catch errors to log them
-      sendBonafideNotification(finalData, gBuffer, gFileName)
-        .catch(err => console.error('Background notification error:', err));
-    } catch (emailErr) {
-      console.error('Error preparing email notification:', emailErr);
+    // Invalidate Redis caches for admin list
+    const keys = await redisClient.keys('admin_list:*');
+    if (keys.length > 0) {
+      await redisClient.del(keys);
     }
 
-    req.session.bonafideData = null;
-    res.render('success', { name: finalData.name });
+    // Generate Word Document asynchronously
+    try {
+      const gBuffer = await generateBonafideDocx(fullData);
+      const gFileName = `${day}-${displayMonth}-${currentYear}-bonafide-certificate-${formData.rollno}.docx`;
+
+      sendBonafideNotification(fullData, gBuffer, gFileName)
+        .catch(err => req.log.error('Background Notification Error', { error: err.message }));
+    } catch (docxErr) {
+      req.log.error('Error generating document buffer', { error: docxErr.message });
+    }
+
+    return res.json({ success: true, message: 'Application submitted successfully!', id: docId });
   } catch (err) {
-    console.error('Error saving form:', err);
-    res.status(500).send('Error saving form data.');
+    req.log.error('Form Submit Error', { error: err.message });
+    return res.status(500).json({ error: 'Failed to process bonafide certificate request.' });
   }
+};
+
+const getAdminForms = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 25;
+    const offset = (page - 1) * limit;
+
+    const { rollno, name } = req.query;
+
+    const cacheKey = `admin_list:${page}:${rollno || ''}:${name || ''}`;
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
+
+    let queryText = 'SELECT id, form_data, downloaded, created_at FROM bonafide_forms WHERE 1=1';
+    const params = [];
+    let paramCounter = 1;
+
+    if (rollno) {
+      queryText += ` AND form_data->>'rollno' ILIKE $${paramCounter}`;
+      params.push(`%${rollno}%`);
+      paramCounter++;
+    }
+
+    if (name) {
+      queryText += ` AND form_data->>'name' ILIKE $${paramCounter}`;
+      params.push(`%${name}%`);
+      paramCounter++;
+    }
+
+    // Get count first
+    let countQuery = `SELECT COUNT(*) FROM (${queryText}) AS temp`;
+    const countRes = await replicaDb.query(countQuery, params);
+    const total = parseInt(countRes.rows[0].count);
+
+    queryText += ` ORDER BY created_at DESC LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`;
+    params.push(limit, offset);
+
+    const formsRes = await replicaDb.query(queryText, params);
+    const totalPages = Math.ceil(total / limit);
+
+    const payload = {
+      forms: formsRes.rows,
+      currentPage: page,
+      totalPages,
+      totalCount: total,
+    };
+
+    // Cache page results for 30s
+    await redisClient.set(cacheKey, JSON.stringify(payload), 'EX', 30);
+
+    return res.json(payload);
+  } catch (err) {
+    req.log.error('Get Admin Forms Error', { error: err.message });
+    return res.status(500).json({ error: 'Failed to fetch certificate applications.' });
+  }
+};
+
+const toggleDownloaded = async (req, res) => {
+  const { id } = req.params;
+  const { downloaded } = req.body;
+  if (!id) {
+    return res.status(400).json({ error: 'ID is required.' });
+  }
+
+  try {
+    await primaryDb.query(
+      'UPDATE bonafide_forms SET downloaded = $1 WHERE id = $2',
+      [!!downloaded, id]
+    );
+
+    // Clean list caches
+    const keys = await redisClient.keys('admin_list:*');
+    if (keys.length > 0) {
+      await redisClient.del(keys);
+    }
+
+    return res.json({ success: true, message: 'Status updated successfully.' });
+  } catch (err) {
+    req.log.error('Toggle Downloaded Error', { error: err.message });
+    return res.status(500).json({ error: 'Failed to update downloaded status.' });
+  }
+};
+
+const downloadDocx = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await replicaDb.query('SELECT form_data FROM bonafide_forms WHERE id = $1', [id]);
+    const form = result.rows[0];
+
+    if (!form) {
+      return res.status(404).json({ error: 'Application not found.' });
+    }
+
+    const gBuffer = await generateBonafideDocx(form.form_data);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename=bonafide-${id}.docx`);
+    return res.send(gBuffer);
+  } catch (err) {
+    req.log.error('Download DOCX Error', { error: err.message });
+    return res.status(500).json({ error: 'Failed to generate download.' });
+  }
+};
+
+module.exports = {
+  submitForm,
+  getAdminForms,
+  toggleDownloaded,
+  downloadDocx,
 };

@@ -1,0 +1,56 @@
+services:
+  postgres_primary:
+    image: postgres:15-alpine
+    container_name: tce_postgres_primary
+    environment:
+      POSTGRES_USER: tce_user
+      POSTGRES_PASSWORD: tce_secure_password
+      POSTGRES_DB: tce_bonafide
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c hot_standby=on
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c work_mem=16MB
+      -c maintenance_work_mem=64MB
+    restart: unless-stopped
+
+  postgres_replica:
+    image: postgres:15-alpine
+    container_name: tce_postgres_replica
+    environment:
+      POSTGRES_USER: tce_user
+      POSTGRES_PASSWORD: tce_secure_password
+      POSTGRES_DB: tce_bonafide
+    ports:
+      - "5435:5432"
+    depends_on:
+      - postgres_primary
+    command: >
+      postgres
+      -c hot_standby=on
+      -c shared_buffers=128MB
+      -c work_mem=8MB
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: tce_redis
+    command: redis-server --requirepass tce_redis_secure_password --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_primary_data:
+  redis_data:
