@@ -1,7 +1,0 @@
-i need a plan typa shit you know
-1. i want to refract the codebase from ejs node to React JS and Node JS
-2. database from firebase to postgresql, redis for caching  production ready stuffs
-3. also i want the specific route for developers that displays the logs okay and other metrics that helps me debugs if the project broke okay???
-4. auth needs to migrate from continue with google to signup and login with email verification, use somethings like without password, if substack no password, only the you know OTP alone to login
-5. don't touch the generateBonafide okay, because it results in the you know certificate to break entirely 
-6. this is production ready application so like do stuffs accoridngly modify the it and give me, give user the best experiences 

@@ -2,7 +2,7 @@
 node_modules/
 jspm_packages/
 web_modules/
-
+node_modules
 # Local env files
 .env
 .env.local
@@ -50,3 +50,7 @@ out/
 # OS metadata files
 .DS_Store
 Thumbs.db
+
+# Firebase configuration & credentials
+firebase/
+project.tar.gz

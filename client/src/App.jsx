@@ -1,122 +1,60 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import api from './api/api';
+import Layout from './components/Layout';
+import Login from './pages/Login';
+import Form from './pages/Form';
+import Admin from './pages/Admin';
+import History from './pages/History';
 
-function App() {
-  const [count, setCount] = useState(0)
+import DevConsole from './pages/DevConsole';
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    api.get('/auth/me')
+      .then(res => {
+        // Response payload structure is { user: { id, email, role, name } }
+        if (res.data && res.data.user) {
+          setUser(res.data.user);
+        } else {
+          setUser(null);
+        }
+        setChecking(false);
+      })
+      .catch(() => {
+        setUser(null);
+        setChecking(false);
+      });
+  }, []);
+
+  const handleLogout = async () => {
+    await api.post('/auth/logout');
+    setUser(null);
+  };
+
+  const getRedirectPath = (role) => {
+    if (role === 'admin') return '/admin';
+    if (role === 'dev' || role === 'developer') return '/admin/dev';
+    return '/form';
+  };
+
+  if (checking) return <div style={{ textAlign: 'center', padding: '3rem' }}>Securing access...</div>;
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    <BrowserRouter>
+      <Layout onLogout={handleLogout} user={user}>
+        <Routes>
+          <Route path="/login" element={user ? <Navigate to={getRedirectPath(user.role)} /> : <Login onAuthSuccess={setUser} />} />
+          <Route path="/form" element={user && user.role !== 'admin' && user.role !== 'dev' && user.role !== 'developer' ? <Form /> : <Navigate to="/login" />} />
+          <Route path="/history" element={user && user.role !== 'admin' && user.role !== 'dev' && user.role !== 'developer' ? <History /> : <Navigate to="/login" />} />
+          <Route path="/admin" element={user && user.role === 'admin' ? <Admin /> : <Navigate to="/login" />} />
+          <Route path="/admin/dev" element={user && (user.role === 'admin' || user.role === 'dev' || user.role === 'developer') ? <DevConsole /> : <Navigate to="/login" />} />
+          <Route path="*" element={<Navigate to={user ? getRedirectPath(user.role) : '/login'} />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
+  );
 }
-
-export default App

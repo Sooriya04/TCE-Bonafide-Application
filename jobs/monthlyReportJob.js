@@ -4,10 +4,11 @@ const { generateBonafideExcel } = require('../utils/monthlyReport');
 const { sendMonthlyReportEmail } = require('../helper/sendMonthlyReportEmail');
 const path = require('path');
 const fs = require('fs');
+const logger = require('../logger');
 
 const scheduleMonthlyReportJob = () => {
   cron.schedule('0 0 1 * *', async () => {
-    console.log('Running monthly report generation job...');
+    logger.info('Running monthly report generation job...');
     try {
       const now = new Date();
       const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -33,12 +34,12 @@ const scheduleMonthlyReportJob = () => {
 
         await generateBonafideExcel(filePath, firstDayLastMonth, lastDayLastMonth, allForms);
         await sendMonthlyReportEmail(filePath, firstDayLastMonth, lastDayLastMonth);
-        console.log('Monthly report job completed successfully.');
+        logger.info('Monthly report job completed successfully.');
       } else {
-        console.log('No forms found for the previous month. Skipping report.');
+        logger.info('No forms found for the previous month. Skipping report.');
       }
     } catch (err) {
-      console.error('Monthly report job failed:', err.message);
+      logger.error('Monthly report job failed', { error: err.message });
     }
   });
 };

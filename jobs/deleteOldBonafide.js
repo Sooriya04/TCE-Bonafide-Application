@@ -1,9 +1,10 @@
 const cron = require('node-cron');
 const primaryDb = require('../db/primary');
+const logger = require('../logger');
 
 // Deletes application requests older than 30 days
 cron.schedule('0 0 * * *', async () => {
-  console.log('Running nightly cleanup job: Deleting old bonafide forms...');
+  logger.info('Running nightly cleanup job: Deleting old bonafide forms...');
   try {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
@@ -12,8 +13,8 @@ cron.schedule('0 0 * * *', async () => {
       'DELETE FROM bonafide_forms WHERE created_at < $1',
       [cutoff]
     );
-    console.log(`Nightly clean up complete. Removed ${result.rowCount} old records.`);
+    logger.info(`Nightly clean up complete. Removed ${result.rowCount} old records.`);
   } catch (err) {
-    console.error('Clean up job failed:', err.message);
+    logger.error('Clean up job failed', { error: err.message });
   }
 });

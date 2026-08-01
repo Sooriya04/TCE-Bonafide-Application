@@ -4,6 +4,19 @@ const redisClient = require('../cache/redis');
 const generateBonafideDocx = require('../helper/generateBonafideDocx');
 const { sendBonafideNotification } = require('../helper/sendBonafideNotification');
 
+// Non-blocking cursor-based scanning to invalidate matched admin list caches
+const invalidateAdminCaches = async () => {
+  let cursor = '0';
+  do {
+    const reply = await redisClient.scan(cursor, 'MATCH', 'admin_list:*', 'COUNT', 100);
+    cursor = reply[0];
+    const keys = reply[1];
+    if (keys && keys.length > 0) {
+      await redisClient.del(keys);
+    }
+  } while (cursor !== '0');
+};
+
 const submitForm = async (req, res) => {
   const formData = req.body;
   if (!formData.rollno || !formData.name || !formData.certificateFor) {
@@ -31,6 +44,7 @@ const submitForm = async (req, res) => {
 
     const fullData = {
       ...formData,
+      email: req.session.user.email,
       date: todayDate,
       academicYear,
       cYear: currentYear,
@@ -38,10 +52,17 @@ const submitForm = async (req, res) => {
     };
 
     const sanitizedPurpose = (formData.certificateFor || 'Other').replace(/[^a-zA-Z0-9]/g, '_');
-    const docId = `${formData.rollno}_${sanitizedPurpose}_${todayDate}`;
+    // Using Date.now() guarantees unique records for multiple same-day submissions
+    const docId = `${formData.rollno}_${sanitizedPurpose}_${Date.now()}`;
 
-    // Cooldown check (5 minutes) from database
-    const existing = await replicaDb.query('SELECT created_at FROM bonafide_forms WHERE id = $1', [docId]);
+    // Cooldown check (5 minutes) based on student email + purpose to prevent duplicate spamming
+    const existing = await primaryDb.query(
+      `SELECT created_at FROM bonafide_forms 
+       WHERE form_data->>'email' = $1 AND form_data->>'certificateFor' = $2
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.session.user.email, formData.certificateFor]
+    );
+
     if (existing.rows[0]) {
       const lastCreatedAt = new Date(existing.rows[0].created_at);
       const diffMs = Date.now() - lastCreatedAt.getTime();
@@ -50,26 +71,20 @@ const submitForm = async (req, res) => {
       if (diffMins < 5) {
         const waitMins = Math.ceil(5 - diffMins);
         return res.status(429).json({
-          error: `You recently submitted this request. Please wait for ${waitMins} more minute(s) before trying again.`,
+          error: `You recently submitted a request for ${formData.certificateFor}. Please wait for ${waitMins} more minute(s) before trying again.`,
         });
       }
     }
 
-    // Save to PostgreSQL (using ON CONFLICT to act as idempotency safeguard)
+    // Save to PostgreSQL. Insert as a distinct new record.
     await primaryDb.query(
-      `INSERT INTO bonafide_forms (id, form_data, created_at)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (id) DO UPDATE SET
-         form_data = EXCLUDED.form_data,
-         created_at = EXCLUDED.created_at`,
+      `INSERT INTO bonafide_forms (id, form_data, created_at, downloaded)
+       VALUES ($1, $2, $3, false)`,
       [docId, JSON.stringify(fullData), now]
     );
 
     // Invalidate Redis caches for admin list
-    const keys = await redisClient.keys('admin_list:*');
-    if (keys.length > 0) {
-      await redisClient.del(keys);
-    }
+    await invalidateAdminCaches();
 
     // Generate Word Document asynchronously
     try {
@@ -161,10 +176,7 @@ const toggleDownloaded = async (req, res) => {
     );
 
     // Clean list caches
-    const keys = await redisClient.keys('admin_list:*');
-    if (keys.length > 0) {
-      await redisClient.del(keys);
-    }
+    await invalidateAdminCaches();
 
     return res.json({ success: true, message: 'Status updated successfully.' });
   } catch (err) {
@@ -183,6 +195,15 @@ const downloadDocx = async (req, res) => {
       return res.status(404).json({ error: 'Application not found.' });
     }
 
+    // Automatically flag downloaded status to true when docx is downloaded
+    await primaryDb.query(
+      'UPDATE bonafide_forms SET downloaded = true WHERE id = $1',
+      [id]
+    );
+
+    // Clear active redis cache pages
+    await invalidateAdminCaches();
+
     const gBuffer = await generateBonafideDocx(form.form_data);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename=bonafide-${id}.docx`);
@@ -193,9 +214,28 @@ const downloadDocx = async (req, res) => {
   }
 };
 
+const getStudentForms = async (req, res) => {
+  try {
+    const studentEmail = req.session.user.email;
+    // Query forms submitted by this student email
+    const result = await replicaDb.query(
+      `SELECT id, form_data, downloaded, created_at 
+       FROM bonafide_forms 
+       WHERE form_data->>'email' = $1 
+       ORDER BY created_at DESC`,
+      [studentEmail]
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    req.log.error('Get Student Forms Error', { error: err.message });
+    return res.status(500).json({ error: 'Failed to fetch your applications.' });
+  }
+};
+
 module.exports = {
   submitForm,
   getAdminForms,
   toggleDownloaded,
   downloadDocx,
+  getStudentForms,
 };

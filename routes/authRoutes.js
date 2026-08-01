@@ -5,6 +5,7 @@ const authCtrl = require('../controllers/authController');
 router.post('/request-otp', authCtrl.requestOTP);
 router.post('/verify-otp', authCtrl.verifyOTP);
 router.post('/admin/login', authCtrl.adminLogin);
+router.post('/dev/login', authCtrl.devLogin);
 router.post('/logout', authCtrl.logout);
 router.get('/me', authCtrl.getMe);
 

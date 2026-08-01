@@ -28,11 +28,9 @@ const requestOTP = async (req, res) => {
 
     // 2. Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const saltRounds = 10;
-    const otpHash = await bcrypt.hash(otp, saltRounds);
 
     // 3. Store OTP in Redis (10 minutes TTL)
-    await redisClient.set(`otp:${email}`, otpHash, 'EX', 600);
+    await redisClient.set(`otp:${email}`, otp, 'EX', 600);
 
     // 4. Send Email
     await sendVerificationEmail(email, otp);
@@ -60,26 +58,26 @@ const verifyOTP = async (req, res) => {
 
     // Validate limit of wrong attempts via Redis counter
     const attemptsKey = `otp_attempts:${email}`;
-    const attempts = await redisClient.incr(attemptsKey);
-    await redisClient.expire(attemptsKey, 600);
 
-    if (attempts > 3) {
-      await redisClient.del(redisKey);
-      await redisClient.del(attemptsKey);
-      return res.status(400).json({ error: 'Too many incorrect attempts. OTP invalidated.' });
-    }
+    if (otp !== storedHash) {
+      const attempts = await redisClient.incr(attemptsKey);
+      await redisClient.expire(attemptsKey, 600);
 
-    const matches = await bcrypt.compare(otp, storedHash);
-    if (!matches) {
-      return res.status(400).json({ error: 'Invalid OTP.' });
+      if (attempts >= 3) {
+        await redisClient.del(redisKey);
+        await redisClient.del(attemptsKey);
+        return res.status(400).json({ error: 'Too many incorrect attempts. OTP invalidated. Please request a new one.' });
+      }
+
+      return res.status(400).json({ error: `Invalid OTP. ${3 - attempts} attempt(s) remaining.` });
     }
 
     // Clean up OTP & attempts keys
     await redisClient.del(redisKey);
     await redisClient.del(attemptsKey);
 
-    // Fetch user details for session payload
-    const userRes = await replicaDb.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]);
+    // Fetch user details for session payload — read from primary to avoid replica lag
+    const userRes = await primaryDb.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]);
     const user = userRes.rows[0];
 
     req.session.user = {
@@ -111,12 +109,9 @@ const adminLogin = async (req, res) => {
       return res.status(500).json({ error: 'Admin auth configuration error.' });
     }
 
-    if (email !== adminEmail) {
-      return res.status(401).json({ error: 'Invalid credentials.' });
-    }
+    const isMatch = await bcrypt.compare(password, adminPasswordHash);
 
-    const valid = await bcrypt.compare(password, adminPasswordHash);
-    if (!valid) {
+    if (email.trim().toLowerCase() !== adminEmail.trim().toLowerCase() || !isMatch) {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
@@ -142,6 +137,43 @@ const logout = (req, res) => {
   });
 };
 
+const devLogin = async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const result = await primaryDb.query(
+      "SELECT * FROM users WHERE LOWER(email) = LOWER($1) AND role IN ('dev', 'developer', 'admin') LIMIT 1",
+      [email.trim()]
+    );
+    const user = result.rows[0];
+
+    if (!user) {
+      return res.status(401).json({ error: 'Developer account not found or access restricted.' });
+    }
+
+    // If password check
+    const devSecret = process.env.DEV_SECRET;
+    if (password !== devSecret) {
+      return res.status(401).json({ error: 'Invalid developer credentials.' });
+    }
+
+    req.session.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role || 'dev',
+    };
+
+    return res.json({ success: true, user: req.session.user });
+  } catch (err) {
+    req.log.error('Dev Login Error', { error: err.message });
+    return res.status(500).json({ error: 'Failed to authenticate developer.' });
+  }
+};
+
 const getMe = (req, res) => {
   if (!req.session.user) {
     return res.status(401).json({ user: null });
@@ -155,4 +187,5 @@ module.exports = {
   adminLogin,
   logout,
   getMe,
+  devLogin,
 };

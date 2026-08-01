@@ -13,11 +13,16 @@ const checkAdmin = (req, res, next) => {
 };
 
 const checkDev = (req, res, next) => {
+  // Allow admins and developers via session, OR fallback to dev token check
+  if (req.session.user && (req.session.user.role === 'admin' || req.session.user.role === 'dev' || req.session.user.role === 'developer')) {
+    return next();
+  }
+
   const token = req.headers['x-dev-token'];
-  const expectedToken = process.env.DEV_SECRET || 'dev_secret_tce_token';
+  const expectedToken = process.env.DEV_SECRET;
 
   if (!token || token !== expectedToken) {
-    return res.status(403).json({ error: 'Access denied. Valid dev token is required.' });
+    return res.status(403).json({ error: 'Access denied. Valid credentials or dev token is required.' });
   }
   next();
 };
