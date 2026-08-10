@@ -88,12 +88,14 @@ const submitForm = async (req, res) => {
 const getStudentForms = async (req, res) => {
   try {
     const studentEmail = req.session.user.email;
+    const rollNoPrefix = studentEmail ? studentEmail.split('@')[0].toUpperCase().trim() : '';
+
     const result = await replicaDb.query(
       `SELECT id, form_data, downloaded, created_at 
        FROM bonafide_forms 
-       WHERE form_data->>'email' = $1 
+       WHERE form_data->>'email' = $1 OR UPPER(form_data->>'rollno') = $2
        ORDER BY created_at DESC`,
-      [studentEmail]
+      [studentEmail, rollNoPrefix]
     );
     return res.json(result.rows);
   } catch (err) {
