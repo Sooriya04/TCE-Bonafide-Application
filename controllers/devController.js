@@ -62,27 +62,146 @@ const getMetrics = async (req, res) => {
 
 const getLogs = async (req, res) => {
   try {
-    const limit = 30; // Limit to last 30 logs as requested
-    const { level } = req.query;
+    const limit  = Math.min(parseInt(req.query.limit)  || 100, 500); // max 500 per page
+    const offset = parseInt(req.query.offset) || 0;
+    const level  = req.query.level  || null;  // 'info' | 'warn' | 'error'
+    const search = req.query.search || null;  // free-text search in message
+    const timeframe = req.query.timeframe || null; // '1h' | '3h' | '1d' | '1w' | '1m'
 
-    let queryText = 'SELECT id, level, message, meta, created_at FROM app_logs';
+    let where = [];
     const params = [];
+    let p = 1;
 
     if (level) {
-      queryText += ' WHERE level = $1';
+      where.push(`level = $${p++}`);
       params.push(level);
     }
+    if (search) {
+      where.push(`message ILIKE $${p++}`);
+      params.push(`%${search}%`);
+    }
+    if (timeframe) {
+      let interval = '';
+      if (timeframe === '1h') interval = "1 hour";
+      else if (timeframe === '3h') interval = "3 hour";
+      else if (timeframe === '1d') interval = "1 day";
+      else if (timeframe === '1w') interval = "7 day";
+      else if (timeframe === '1m') interval = "30 day";
 
-    queryText += ` ORDER BY created_at DESC LIMIT ${limit}`;
-    const logsRes = await replicaDb.query(queryText, params);
+      if (interval) {
+        where.push(`created_at >= NOW() - INTERVAL '${interval}'`);
+      }
+    }
+
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    // Total count for pagination metadata
+    const countRes = await replicaDb.query(
+      `SELECT COUNT(*) FROM app_logs ${whereClause}`,
+      params
+    );
+    const total = parseInt(countRes.rows[0].count, 10);
+
+    // Paged logs
+    const logsRes = await replicaDb.query(
+      `SELECT id, level, message, meta, created_at FROM app_logs ${whereClause}
+       ORDER BY created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
+      [...params, limit, offset]
+    );
 
     return res.json({
-      logs: logsRes.rows
+      logs: logsRes.rows,
+      total,
+      limit,
+      offset,
     });
   } catch (err) {
     console.error('Dev fetch logs error:', err.message);
     return res.status(500).json({ error: 'Failed to retrieve log data.' });
   }
+};
+
+// GET /api/dev/logs/count — quick total for badge display
+const getLogsCount = async (req, res) => {
+  try {
+    const level  = req.query.level  || null;
+    const search = req.query.search || null;
+    const timeframe = req.query.timeframe || null;
+    let where = [];
+    const params = [];
+    let p = 1;
+    if (level)  { where.push(`level = $${p++}`); params.push(level); }
+    if (search) { where.push(`message ILIKE $${p++}`); params.push(`%${search}%`); }
+    if (timeframe) {
+      let interval = '';
+      if (timeframe === '1h') interval = "1 hour";
+      else if (timeframe === '3h') interval = "3 hour";
+      else if (timeframe === '1d') interval = "1 day";
+      else if (timeframe === '1w') interval = "7 day";
+      else if (timeframe === '1m') interval = "30 day";
+
+      if (interval) {
+        where.push(`created_at >= NOW() - INTERVAL '${interval}'`);
+      }
+    }
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const res2 = await replicaDb.query(`SELECT COUNT(*) FROM app_logs ${whereClause}`, params);
+    return res.json({ total: parseInt(res2.rows[0].count, 10) });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to get log count.' });
+  }
+};
+
+// GET /api/dev/logs/stream — Server-Sent Events live tail (replaces 10s polling)
+const streamLogs = async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const level  = req.query.level  || null;
+  const search = req.query.search || null;
+
+  let lastId = 0;
+
+  // Get the current max ID so we only stream NEW logs from this point forward
+  try {
+    const maxRes = await replicaDb.query('SELECT MAX(id) FROM app_logs');
+    lastId = parseInt(maxRes.rows[0].max) || 0;
+  } catch (_) {}
+
+  const poll = async () => {
+    try {
+      let where = [`id > $1`];
+      const params = [lastId];
+      let p = 2;
+      if (level)  { where.push(`level = $${p++}`); params.push(level); }
+      if (search) { where.push(`message ILIKE $${p++}`); params.push(`%${search}%`); }
+
+      const result = await replicaDb.query(
+        `SELECT id, level, message, meta, created_at FROM app_logs
+         WHERE ${where.join(' AND ')}
+         ORDER BY id ASC LIMIT 50`,
+        params
+      );
+
+      for (const row of result.rows) {
+        res.write(`data: ${JSON.stringify(row)}\n\n`);
+        lastId = row.id;
+      }
+    } catch (err) {
+      res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
+    }
+  };
+
+  // Poll DB every 2 seconds for new log rows
+  const interval = setInterval(poll, 2000);
+
+  // Clean up when client disconnects
+  req.on('close', () => {
+    clearInterval(interval);
+    res.end();
+  });
 };
 
 const getDevUsers = async (req, res) => {
@@ -141,6 +260,8 @@ module.exports = {
   getHealth,
   getMetrics,
   getLogs,
+  getLogsCount,
+  streamLogs,
   getDevUsers,
   addDevUser,
   deleteDevUser,

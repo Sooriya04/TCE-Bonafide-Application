@@ -10,9 +10,21 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
 
-  const fetchForms = (p) => {
+  // Search filter states
+  const [searchRollNo, setSearchRollNo] = useState('');
+  const [searchName, setSearchName] = useState('');
+  const [activeRollNo, setActiveRollNo] = useState('');
+  const [activeName, setActiveName] = useState('');
+
+  // History drawer states
+  const [selectedStudentRoll, setSelectedStudentRoll] = useState(null);
+  const [studentHistory, setStudentHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
+
+  const fetchForms = (p, roll = activeRollNo, nm = activeName) => {
     setLoading(true);
-    api.get(`/bonafide/admin/forms?page=${p}`)
+    api.get(`/bonafide/admin/forms?page=${p}&rollno=${roll}&name=${nm}`)
       .then(res => {
         const data = res.data;
         setForms(data.forms);
@@ -24,12 +36,59 @@ export default function Admin() {
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetchForms(page); }, [page]);
+  useEffect(() => {
+    fetchForms(page, activeRollNo, activeName);
+  }, [page, activeRollNo, activeName]);
 
   // Recalculate pending count dynamically when forms list changes
   useEffect(() => {
     setPending(forms.filter(f => !f.downloaded).length);
   }, [forms]);
+
+  // Escape key handler for drawer
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowDrawer(false);
+      }
+    };
+    if (showDrawer) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showDrawer]);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    setPage(1);
+    setActiveRollNo(searchRollNo);
+    setActiveName(searchName);
+  };
+
+  const handleClearSearch = () => {
+    setSearchRollNo('');
+    setSearchName('');
+    setPage(1);
+    setActiveRollNo('');
+    setActiveName('');
+  };
+
+  const handleViewHistory = async (rollno) => {
+    setSelectedStudentRoll(rollno);
+    setShowDrawer(true);
+    setHistoryLoading(true);
+    try {
+      const res = await api.get(`/bonafide/admin/student/${rollno}/history`);
+      setStudentHistory(res.data);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load student history.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const toggleDownloaded = async (id, current) => {
     setActionLoading(id);
@@ -81,7 +140,7 @@ export default function Admin() {
           className="btn-secondary" 
           style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}
         >
-          ⚙ Developer Console
+          Developer Console
         </a>
       </div>
 
@@ -100,6 +159,40 @@ export default function Admin() {
           <div className="stat-label">Downloaded</div>
         </div>
       </div>
+
+      {/* Search and Filters */}
+      <form className="admin-filters-bar" onSubmit={handleSearchSubmit}>
+        <div className="filter-group">
+          <label htmlFor="search-rollno">Roll No</label>
+          <input 
+            type="text" 
+            id="search-rollno" 
+            className="filter-input" 
+            placeholder="Search by Roll No..."
+            value={searchRollNo}
+            onChange={(e) => setSearchRollNo(e.target.value)}
+          />
+        </div>
+        <div className="filter-group">
+          <label htmlFor="search-name">Student Name</label>
+          <input 
+            type="text" 
+            id="search-name" 
+            className="filter-input" 
+            placeholder="Search by Name..."
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+          />
+        </div>
+        <div className="filter-actions">
+          <button type="submit" className="btn-primary" style={{ padding: '8px 20px', fontSize: '0.85rem' }}>
+            Search
+          </button>
+          <button type="button" className="btn-secondary" onClick={handleClearSearch} style={{ padding: '8px 20px', fontSize: '0.85rem' }}>
+            Clear
+          </button>
+        </div>
+      </form>
 
       {/* Table Panel */}
       <div className="form-panel" style={{ padding: 0 }}>
@@ -122,13 +215,16 @@ export default function Admin() {
                   <th>Purpose</th>
                   <th>Submitted</th>
                   <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th style={{ textAlign: 'right' }}>Action</th>
+                  <th style={{ textAlign: 'right' }}>History</th>
                 </tr>
               </thead>
               <tbody>
                 {forms.map(form => (
                   <tr key={form.id}>
-                    <td style={{ fontFamily: 'monospace', fontWeight: '600' }}>{form.form_data?.rollno || '—'}</td>
+                    <td style={{ fontFamily: 'monospace', fontWeight: '600' }}>
+                      {form.form_data?.rollno || '—'}
+                    </td>
                     <td>{form.form_data?.name || '—'}</td>
                     <td style={{ maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {form.form_data?.branch || '—'}
@@ -151,8 +247,21 @@ export default function Admin() {
                         className="btn-primary"
                         style={{ padding: '6px 14px', fontSize: '0.78rem' }}
                       >
-                        ↓ Download DOCX
+                        Download DOCX
                       </button>
+                    </td>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      {form.form_data?.rollno ? (
+                        <button
+                          onClick={() => handleViewHistory(form.form_data.rollno)}
+                          className="btn-secondary"
+                          style={{ padding: '6px 14px', fontSize: '0.78rem' }}
+                        >
+                          View History
+                        </button>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -171,7 +280,7 @@ export default function Admin() {
             onClick={() => setPage(p => p - 1)}
             style={{ padding: '7px 16px', fontSize: '0.8rem' }}
           >
-            ← Previous
+            Previous
           </button>
           <span>Page {page} of {totalPages}</span>
           <button
@@ -180,8 +289,68 @@ export default function Admin() {
             onClick={() => setPage(p => p + 1)}
             style={{ padding: '7px 16px', fontSize: '0.8rem' }}
           >
-            Next →
+            Next
           </button>
+        </div>
+      )}
+
+      {/* History Drawer */}
+      {showDrawer && (
+        <div className="drawer-overlay" onClick={() => setShowDrawer(false)}>
+          <div className="drawer-content" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-header">
+              <h2>Student History — {selectedStudentRoll}</h2>
+              <button className="drawer-close-btn" onClick={() => setShowDrawer(false)} aria-label="Close drawer">
+                Close
+              </button>
+            </div>
+            <div className="drawer-body">
+              {historyLoading ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                  Loading student history...
+                </div>
+              ) : studentHistory.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                  No prior submissions found for this student.
+                </div>
+              ) : (
+                <div>
+                  {studentHistory.map((item) => (
+                    <div key={item.id} className="history-item">
+                      <div className="history-header">
+                        <span className="history-purpose" style={{ fontWeight: '600', color: 'var(--accent)' }}>
+                          {item.form_data?.certificateFor || '—'}
+                        </span>
+                        <span className="history-date" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {formatDate(item.created_at)}
+                        </span>
+                      </div>
+                      <div className="history-details" style={{ marginTop: '8px' }}>
+                        <div className="history-detail-row">
+                          <span className="history-detail-label">Name: </span>
+                          <span className="history-detail-val">{item.form_data?.name || '—'}</span>
+                        </div>
+                        <div className="history-detail-row">
+                          <span className="history-detail-label">Branch: </span>
+                          <span className="history-detail-val">{item.form_data?.branch || '—'}</span>
+                        </div>
+                        <div className="history-detail-row">
+                          <span className="history-detail-label">Academic Year: </span>
+                          <span className="history-detail-val">{item.form_data?.academicYear || '—'}</span>
+                        </div>
+                        <div className="history-detail-row">
+                          <span className="history-detail-label">Status: </span>
+                          <span className="history-detail-val" style={{ color: item.downloaded ? 'var(--success)' : 'var(--warning)' }}>
+                            {item.downloaded ? 'Downloaded' : 'Pending'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

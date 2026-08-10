@@ -1,57 +1,181 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../api/api';
+import SystemStats from '../components/DevConsole/SystemStats';
+import LogViewer from '../components/DevConsole/LogViewer';
+import DevManagement from '../components/DevConsole/DevManagement';
 
 export default function DevConsole() {
+  // system data
   const [health, setHealth] = useState(null);
   const [metrics, setMetrics] = useState(null);
-  const [logs, setLogs] = useState([]);
   const [devs, setDevs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initLoading, setInitLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Form states to add developer
+  // log viewer state
+  const [logs, setLogs] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const LIMIT = 100;
+  const [levelFilter, setLevelFilter] = useState(''); // '' | 'info' | 'warn' | 'error'
+  const [timeframe, setTimeframe] = useState(''); // '' | '1h' | '3h' | '1d' | '1w' | '1m'
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [showRelative, setShowRelative] = useState(true);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [liveMode, setLiveMode] = useState(false);
+  const [newLogIds, setNewLogIds] = useState(new Set());
+  const [logsLoading, setLogsLoading] = useState(false);
+
+  const logsEndRef = useRef(null);
+  const sseRef = useRef(null);
+  const searchTimer = useRef(null);
+
+  // dev form
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  const fetchDevData = async () => {
+  // Data fetching
+  const fetchSysData = useCallback(async () => {
     try {
-      const [healthRes, metricsRes, logsRes, devsRes] = await Promise.all([
+      const [h, m, d] = await Promise.all([
         api.get('/dev/health'),
         api.get('/dev/metrics'),
-        api.get('/dev/logs'),
-        api.get('/dev/users')
+        api.get('/dev/users'),
       ]);
-
-      setHealth(healthRes.data);
-      setMetrics(metricsRes.data);
-      setLogs(logsRes.data.logs);
-      setDevs(devsRes.data);
-      setLoading(false);
+      setHealth(h.data);
+      setMetrics(m.data);
+      setDevs(d.data);
     } catch (err) {
-      setError('Failed to retrieve system status metrics.');
-      setLoading(false);
+      setError('Failed to load system metrics.');
+    } finally {
+      setInitLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchDevData();
-    const interval = setInterval(fetchDevData, 10000); // refresh every 10s
-    return () => clearInterval(interval);
   }, []);
 
+  const fetchLogs = useCallback(async (lvl = levelFilter, tf = timeframe, srch = search, off = 0, append = false) => {
+    setLogsLoading(true);
+    try {
+      const params = { limit: LIMIT, offset: off };
+      if (lvl) params.level = lvl;
+      if (tf) params.timeframe = tf;
+      if (srch) params.search = srch;
+      const res = await api.get('/dev/logs', { params });
+      const incoming = res.data.logs || [];
+      setTotal(res.data.total || 0);
+      if (append) {
+        setLogs(prev => [...prev, ...incoming]);
+      } else {
+        setLogs(incoming);
+      }
+      setOffset(off);
+    } catch (err) {
+      setError('Failed to load logs.');
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [levelFilter, timeframe, search]);
+
+  // SSE live streaming
+  const startSSE = useCallback(() => {
+    if (sseRef.current) sseRef.current.close();
+    const params = new URLSearchParams();
+    if (levelFilter) params.set('level', levelFilter);
+    if (search) params.set('search', search);
+    // Note: live stream operates on incoming real-time events, timeframe is not applicable here
+    const url = `/api/dev/logs/stream?${params.toString()}`;
+    const es = new EventSource(url, { withCredentials: true });
+
+    es.onmessage = (e) => {
+      try {
+        const log = JSON.parse(e.data);
+        setLogs(prev => [log, ...prev]);
+        setTotal(t => t + 1);
+        setNewLogIds(ids => new Set([...ids, log.id]));
+        setTimeout(() => setNewLogIds(ids => { const n = new Set(ids); n.delete(log.id); return n; }), 2000);
+      } catch (_) {}
+    };
+
+    sseRef.current = es;
+  }, [levelFilter, search]);
+
+  const stopSSE = useCallback(() => {
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+  }, []);
+
+  // Download logs as .txt
+  const downloadLogs = async () => {
+    try {
+      const params = { limit: 2000, offset: 0 };
+      if (levelFilter) params.level = levelFilter;
+      if (timeframe) params.timeframe = timeframe;
+      if (search) params.search = search;
+      const res = await api.get('/dev/logs', { params });
+      const lines = (res.data.logs || []).map(l =>
+        `[${new Date(l.created_at).toISOString()}] [${l.level?.toUpperCase()}] ${l.message}`
+      ).join('\n');
+      const blob = new Blob([lines], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tce-logs-${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (_) {}
+  };
+
+  // Effects
+  useEffect(() => {
+    fetchSysData();
+    fetchLogs('', '', '', 0);
+    const sysInterval = setInterval(fetchSysData, 30000);
+    return () => {
+      clearInterval(sysInterval);
+      stopSSE();
+    };
+  }, []);
+
+  // Toggle live mode
+  useEffect(() => {
+    if (liveMode) startSSE();
+    else stopSSE();
+  }, [liveMode]);
+
+  // Re-fetch logs when filter, timeframe, or search changes
+  useEffect(() => {
+    if (!liveMode) fetchLogs(levelFilter, timeframe, search, 0);
+    else startSSE();
+  }, [levelFilter, timeframe, search]);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (autoScroll && logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs, autoScroll]);
+
+  // Debounced search
+  const handleSearchInput = (v) => {
+    setSearchInput(v);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setSearch(v), 400);
+  };
+
+  // Dev account handlers
   const handleAddDev = async (e) => {
     e.preventDefault();
     if (formSubmitting) return;
     setFormSubmitting(true);
-    setError(null);
     try {
       await api.post('/dev/users', { email: newEmail, name: newName });
       setNewEmail('');
       setNewName('');
-      // Reload dev list
-      const devsRes = await api.get('/dev/users');
-      setDevs(devsRes.data);
+      const d = await api.get('/dev/users');
+      setDevs(d.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to add developer.');
     } finally {
@@ -60,22 +184,20 @@ export default function DevConsole() {
   };
 
   const handleRevokeDev = async (id) => {
-    if (!window.confirm('Are you sure you want to revoke developer permissions for this account?')) return;
-    setError(null);
+    if (!window.confirm('Revoke developer access for this account?')) return;
     try {
       await api.delete(`/dev/users/${id}`);
-      // Reload dev list
-      const devsRes = await api.get('/dev/users');
-      setDevs(devsRes.data);
-    } catch (err) {
-      setError('Failed to revoke developer access.');
+      const d = await api.get('/dev/users');
+      setDevs(d.data);
+    } catch (_) {
+      setError('Failed to revoke access.');
     }
   };
 
-  if (loading) {
+  if (initLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-        Checking server health & loading logs…
+      <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+        Loading developer console...
       </div>
     );
   }
@@ -85,218 +207,63 @@ export default function DevConsole() {
       {/* Header */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1>⚙ Developer Console</h1>
-          <p>Real-time system diagnostics, health telemetry, log tracing, and developer accounts</p>
+          <h1>Developer Console</h1>
+          <p>Real-time system diagnostics, live log streaming, and developer management</p>
         </div>
         <a href="/admin" className="btn-secondary" style={{ textDecoration: 'none', fontSize: '0.85rem' }}>
-          ← Back to Requests
+          Back to Requests
         </a>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      {/* Health Checks Status */}
-      <div className="stats-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: health?.status === 'healthy' ? 'var(--success)' : 'var(--error)' }}>
-            {health?.status?.toUpperCase() || 'UNKNOWN'}
-          </div>
-          <div className="stat-label">System Health</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: health?.checks?.postgres_primary ? 'var(--success)' : 'var(--error)' }}>
-            {health?.checks?.postgres_primary ? 'ONLINE' : 'OFFLINE'}
-          </div>
-          <div className="stat-label">Primary Database</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: health?.checks?.redis ? 'var(--success)' : 'var(--error)' }}>
-            {health?.checks?.redis ? 'ONLINE' : 'OFFLINE'}
-          </div>
-          <div className="stat-label">Redis Cache</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: 'var(--text)' }}>
-            {metrics?.uptime_seconds ? `${Math.floor(metrics.uptime_seconds / 60)}m` : '—'}
-          </div>
-          <div className="stat-label">Server Uptime</div>
-        </div>
-      </div>
+      {/* System Health Stats & Memory */}
+      <SystemStats health={health} metrics={metrics} />
 
-      {/* Grid: Memory Metrics + System Logs */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', marginBottom: '24px' }}>
-        {/* Memory Usage Card */}
-        <div className="form-panel" style={{ padding: '24px' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '16px', color: 'var(--accent)' }}>System Memory Usage</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Resident Set Size (RSS):</span>
-              <strong style={{ color: 'var(--text)' }}>{metrics?.memory?.rss || '—'}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Heap Memory Used:</span>
-              <strong style={{ color: 'var(--text)' }}>{metrics?.memory?.heapUsed || '—'}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Heap Memory Total:</span>
-              <strong style={{ color: 'var(--text)' }}>{metrics?.memory?.heapTotal || '—'}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Redis Memory footprint:</span>
-              <strong style={{ color: 'var(--text)' }}>
-                {metrics?.redis_memory_info?.[0] ? metrics.redis_memory_info[0].split(':')[1] : '—'}
-              </strong>
-            </div>
-          </div>
-        </div>
+      {/* Logs Viewer */}
+      <LogViewer
+        logs={logs}
+        total={total}
+        offset={offset}
+        LIMIT={LIMIT}
+        levelFilter={levelFilter}
+        setLevelFilter={setLevelFilter}
+        searchInput={searchInput}
+        handleSearchInput={handleSearchInput}
+        showRelative={showRelative}
+        setShowRelative={setShowRelative}
+        autoScroll={autoScroll}
+        setAutoScroll={setAutoScroll}
+        liveMode={liveMode}
+        setLiveMode={setLiveMode}
+        newLogIds={newLogIds}
+        logsLoading={logsLoading}
+        logsEndRef={logsEndRef}
+        downloadLogs={downloadLogs}
+        fetchLogs={fetchLogs}
+        timeframe={timeframe}
+        setTimeframe={setTimeframe}
+      />
 
-        {/* Real-time System Logs */}
-        <div className="form-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--accent)', margin: 0 }}>System Logs (Last 30 entries)</h2>
-            <button className="btn-secondary" onClick={fetchDevData} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
-              Refresh Logs
-            </button>
-          </div>
+      {/* Developer Management */}
+      <DevManagement
+        devs={devs}
+        newName={newName}
+        setNewName={setNewName}
+        newEmail={newEmail}
+        setNewEmail={setNewEmail}
+        formSubmitting={formSubmitting}
+        handleAddDev={handleAddDev}
+        handleRevokeDev={handleRevokeDev}
+      />
 
-          <div style={{
-            background: '#1e1e1e',
-            color: '#d4d4d4',
-            padding: '16px',
-            fontFamily: 'monospace',
-            fontSize: '0.75rem',
-            borderRadius: '2px',
-            overflowY: 'auto',
-            maxHeight: '160px',
-            whiteSpace: 'pre-wrap',
-            flex: 1
-          }}>
-            {logs.length === 0 ? (
-              <div style={{ color: '#888', textAlign: 'center', padding: '20px' }}>No logs recorded in PostgreSQL log database.</div>
-            ) : (
-              logs.map(log => {
-                let color = '#d4d4d4';
-                if (log.level === 'error' || log.level?.includes('error')) color = '#f44336';
-                if (log.level === 'warn' || log.level?.includes('warn')) color = '#ffeb3b';
-                if (log.level === 'info' || log.level?.includes('info')) color = '#4caf50';
-
-                // Safe parsing of log.meta
-                let parsedMeta = null;
-                if (log.meta) {
-                  if (typeof log.meta === 'object') {
-                    parsedMeta = log.meta;
-                  } else {
-                    try {
-                      parsedMeta = JSON.parse(log.meta);
-                    } catch (e) {
-                      parsedMeta = { raw: String(log.meta) };
-                    }
-                  }
-                }
-
-                return (
-                  <div key={log.id} style={{ marginBottom: '6px', lineHeight: '1.4' }}>
-                    <span style={{ color: '#888' }}>[{new Date(log.created_at).toLocaleTimeString()}]</span>{' '}
-                    <span style={{ color, fontWeight: 'bold' }}>{log.level?.toUpperCase()}</span>:{' '}
-                    <span>{log.message}</span>
-                    {parsedMeta && Object.keys(parsedMeta).length > 0 && (
-                      <span style={{ color: '#6a9955', marginLeft: '6px' }}>
-                        {JSON.stringify(parsedMeta)}
-                      </span>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Section: Developer Accounts Management */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', marginTop: '24px' }}>
-        {/* Add Developer Form */}
-        <div className="form-panel" style={{ padding: '24px' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '16px', color: 'var(--accent)' }}>Grant Dev Role</h2>
-          <form onSubmit={handleAddDev}>
-            <div className="field-item" style={{ marginBottom: '12px' }}>
-              <label className="field-label">Name</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="e.g. S. Sooriya"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="field-item" style={{ marginBottom: '16px' }}>
-              <label className="field-label">Email</label>
-              <input
-                type="email"
-                className="form-control"
-                placeholder="name@student.tce.edu"
-                value={newEmail}
-                onChange={e => setNewEmail(e.target.value)}
-                required
-              />
-            </div>
-            <button type="submit" className="btn-primary" style={{ width: '100%' }} disabled={formSubmitting}>
-              {formSubmitting ? 'Adding…' : 'Add Developer'}
-            </button>
-          </form>
-        </div>
-
-        {/* Developers List Table */}
-        <div className="form-panel" style={{ padding: '24px' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '16px', color: 'var(--accent)' }}>Registered Developers</h2>
-          <div className="data-table-wrap" style={{ maxHeight: '250px' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Granted On</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {devs.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
-                      No developer accounts registered.
-                    </td>
-                  </tr>
-                ) : (
-                  devs.map(dev => (
-                    <tr key={dev.id}>
-                      <td style={{ fontWeight: '600' }}>{dev.name}</td>
-                      <td>{dev.email}</td>
-                      <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {new Date(dev.created_at).toLocaleDateString('en-IN')}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button
-                          onClick={() => handleRevokeDev(dev.id)}
-                          className="badge"
-                          style={{
-                            background: 'var(--error-bg)',
-                            color: 'var(--error)',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontFamily: 'Montserrat, sans-serif'
-                          }}
-                        >
-                          Revoke Access
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      {/* pulse animation keyframe */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
     </div>
   );
 }

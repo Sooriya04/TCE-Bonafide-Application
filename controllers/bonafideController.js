@@ -83,8 +83,9 @@ const submitForm = async (req, res) => {
       [docId, JSON.stringify(fullData), now]
     );
 
-    // Invalidate Redis caches for admin list
+    // Invalidate Redis caches for admin list and this student's history
     await invalidateAdminCaches();
+    await redisClient.del(`student_list:${req.session.user.email}`);
 
     // Generate Word Document asynchronously
     try {
@@ -232,10 +233,31 @@ const getStudentForms = async (req, res) => {
   }
 };
 
+const getStudentHistoryForAdmin = async (req, res) => {
+  try {
+    const { rollno } = req.params;
+    if (!rollno) {
+      return res.status(400).json({ error: 'Roll number is required.' });
+    }
+    const result = await replicaDb.query(
+      `SELECT id, form_data, downloaded, created_at 
+       FROM bonafide_forms 
+       WHERE form_data->>'rollno' = $1 
+       ORDER BY created_at DESC`,
+      [rollno]
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    req.log.error('Get Student History For Admin Error', { error: err.message });
+    return res.status(500).json({ error: 'Failed to fetch student history.' });
+  }
+};
+
 module.exports = {
   submitForm,
   getAdminForms,
   toggleDownloaded,
   downloadDocx,
   getStudentForms,
+  getStudentHistoryForAdmin,
 };

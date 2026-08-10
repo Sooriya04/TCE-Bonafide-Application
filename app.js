@@ -4,6 +4,7 @@ const session = require('express-session');
 const RedisStore = require('connect-redis').default;
 const helmet = require('helmet');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
@@ -45,12 +46,19 @@ require('./jobs/deleteOldBonafide');
 const { scheduleMonthlyReportJob } = require('./jobs/monthlyReportJob');
 scheduleMonthlyReportJob();
 
+
 const app = express();
 
 app.set('trust proxy', 1);
 
+// ─── Security Headers (Helmet) ─────────────────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: false,
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -64,9 +72,7 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       connectSrc: [
         "'self'",
-        "https://bonafideapp.tceapps.in/login",
         "https://bonafideapp.tceapps.in",
-        "http://bonafideapp.tceapps.in",
         "https://*.tceapps.in",
         process.env.FRONTEND_URL || '',
         "http://localhost:3000",
@@ -79,22 +85,24 @@ app.use(helmet({
   },
 }));
 
+// ─── CORS ──────────────────────────────────────────────────────────────────────
 app.use(cors({
   origin: (origin, callback) => {
     // Same-origin requests or server-to-server calls have no Origin header — always allow
     if (!origin) return callback(null, true);
 
-    if (
+    const originIsAllowed = (
+      // FIX: use endsWith to prevent evil-tceapps.in.attacker.com matching includes()
       origin.endsWith('.tceapps.in') ||
-      origin.includes('tceapps.in') ||
+      origin === 'https://tceapps.in' ||
+      origin === 'http://tceapps.in' ||
       origin.startsWith('http://localhost:') ||
       origin.startsWith('https://localhost:') ||
       (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) ||
       (process.env.CORS_ORIGIN && origin === process.env.CORS_ORIGIN)
-    ) {
-      return callback(null, true);
-    }
+    );
 
+    if (originIsAllowed) return callback(null, true);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true
@@ -103,7 +111,7 @@ app.use(cors({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Session configuration backed by Redis (fully validated env secret)
+// ─── Session (Redis-backed) ────────────────────────────────────────────────────
 app.use(session({
   store: new RedisStore({ client: redisClient, prefix: 'tce_sess:' }),
   secret: process.env.SESSION_SECRET,
@@ -117,7 +125,7 @@ app.use(session({
   }
 }));
 
-// Request logger middleware binding UUIDs to requests
+// ─── Request Logger ────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   req.id = uuidv4();
   req.log = logger.child({ requestId: req.id });
@@ -125,23 +133,59 @@ app.use((req, res, next) => {
   next();
 });
 
-// Import API routers
+// ─── Rate Limiters ─────────────────────────────────────────────────────────────
+
+// OTP request: 5 attempts per 15 min per IP
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many OTP requests from this IP. Please wait 15 minutes before trying again.' },
+});
+
+// Admin login: 3 attempts per 15 min per IP
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Please wait 15 minutes before trying again.' },
+});
+
+// Dev login: 5 attempts per 15 min per IP
+const devLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many developer login attempts. Please wait before trying again.' },
+});
+
+// ─── API Routes ────────────────────────────────────────────────────────────────
 const authRoutes = require('./routes/authRoutes');
 const bonafideRoutes = require('./routes/bonafideRoutes');
 const devRoutes = require('./routes/devRoutes');
+
+// Apply rate limiters directly on sensitive auth routes
+app.post('/api/auth/request-otp', otpLimiter);
+app.post('/api/auth/admin/login', adminLoginLimiter);
+app.post('/api/auth/dev/login', devLoginLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/bonafide', bonafideRoutes);
 app.use('/api/dev', devRoutes);
 
-// Serve static assets from React client build
-app.use(express.static(path.join(__dirname, 'client/dist')));
+// ─── Health Check (Nginx watchdog) ────────────────────────────────────────────
+app.get('/health', (req, res) => res.json({ status: 'ok', ts: Date.now() }));
 
-// Fallback: Serve React SPA index.html for all other non-API routes
+// ─── Serve React SPA ──────────────────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, 'client/dist')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/dist/index.html'));
 });
 
+// ─── Error Handler ─────────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   const reqLog = req.log || logger;
   reqLog.error(`Server Exception: ${err.message}`, { stack: err.stack });
