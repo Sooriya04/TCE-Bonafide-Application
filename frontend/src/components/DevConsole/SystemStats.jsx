@@ -4,27 +4,33 @@ export default function SystemStats({ health, metrics }) {
   return (
     <div>
       {/* Health Stats */}
-      <div className="stats-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      <div className="stats-row" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '20px' }}>
         <div className="stat-card">
-          <div className="stat-value" style={{ color: health?.status === 'healthy' ? 'var(--success)' : 'var(--error)' }}>
-            {health?.status?.toUpperCase() || 'UNKNOWN'}
+          <div className="stat-value" style={{ color: health?.checks?.student_service ? 'var(--success)' : 'var(--error)', fontSize: '1.1rem' }}>
+            {health?.checks?.student_service ? 'ONLINE' : 'OFFLINE'}
           </div>
-          <div className="stat-label">System Health</div>
+          <div className="stat-label">Student Service</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value" style={{ color: health?.checks?.postgres_primary ? 'var(--success)' : 'var(--error)' }}>
+          <div className="stat-value" style={{ color: health?.checks?.admin_service ? 'var(--success)' : 'var(--error)', fontSize: '1.1rem' }}>
+            {health?.checks?.admin_service ? 'ONLINE' : 'OFFLINE'}
+          </div>
+          <div className="stat-label">Admin Service</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: health?.checks?.postgres_primary ? 'var(--success)' : 'var(--error)', fontSize: '1.1rem' }}>
             {health?.checks?.postgres_primary ? 'ONLINE' : 'OFFLINE'}
           </div>
-          <div className="stat-label">Primary DB</div>
+          <div className="stat-label">PostgreSQL DB</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value" style={{ color: health?.checks?.redis ? 'var(--success)' : 'var(--error)' }}>
+          <div className="stat-value" style={{ color: health?.checks?.redis ? 'var(--success)' : 'var(--error)', fontSize: '1.1rem' }}>
             {health?.checks?.redis ? 'ONLINE' : 'OFFLINE'}
           </div>
           <div className="stat-label">Redis Cache</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value" style={{ color: 'var(--text)' }}>
+          <div className="stat-value" style={{ color: 'var(--text)', fontSize: '1.1rem' }}>
             {metrics?.uptime_seconds ? `${Math.floor(metrics.uptime_seconds / 60)}m` : '—'}
           </div>
           <div className="stat-label">Uptime</div>

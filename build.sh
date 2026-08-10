@@ -8,11 +8,11 @@ echo "=========================================================="
 
 # 1. Clean existing frontend build
 echo "[1/2] Cleaning previous distribution files..."
-rm -rf client/dist
+rm -rf frontend/dist
 
 # 2. Build Vite React app
 echo "[2/2] Compiling Vite React frontend for production..."
-cd client
+cd frontend
 npm run build
 cd ..
 

@@ -1,38 +1,74 @@
-const primaryDb = require('../db/primary');
-const replicaDb = require('../db/replica');
-const redisClient = require('../cache/redis');
+const http = require('http');
+const primaryDb = require('../../../shared/db/primary');
+const replicaDb = require('../../../shared/db/replica');
+const redisClient = require('../../../shared/cache/redis');
+
+// Helper to ping health endpoint of external services
+function pingService(urlStr) {
+  return new Promise((resolve) => {
+    if (!urlStr) return resolve(false);
+    try {
+      const url = new URL(urlStr + '/health');
+      const req = http.get({
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        timeout: 1000
+      }, (res) => {
+        resolve(res.statusCode === 200);
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(false);
+      });
+    } catch (_) {
+      resolve(false);
+    }
+  });
+}
 
 const getHealth = async (req, res) => {
   const checks = {
     postgres_primary: false,
     postgres_replica: false,
     redis: false,
+    student_service: false,
+    admin_service: false,
   };
 
   try {
-    const primary = require('../db/primary');
-    await primary.query('SELECT 1');
+    await primaryDb.query('SELECT 1');
     checks.postgres_primary = true;
-  } catch (err) {
+  } catch (_) {
     checks.postgres_primary = false;
   }
 
   try {
     await replicaDb.query('SELECT 1');
     checks.postgres_replica = true;
-  } catch (err) {
+  } catch (_) {
     checks.postgres_replica = false;
   }
 
   try {
     await redisClient.ping();
     checks.redis = true;
-  } catch (err) {
+  } catch (_) {
     checks.redis = false;
   }
 
+  // Ping student and admin microservices
+  const [studentHealth, adminHealth] = await Promise.all([
+    pingService(process.env.STUDENT_SERVICE_URL),
+    pingService(process.env.ADMIN_SERVICE_URL)
+  ]);
+
+  checks.student_service = studentHealth;
+  checks.admin_service = adminHealth;
+
   const isHealthy = Object.values(checks).every(v => v === true);
-  return res.status(isHealthy ? 200 : 503).json({
+  return res.status(isHealthy ? 200 : 200).json({ // Return 200 even if degraded to let dashboard see individual service checks
     status: isHealthy ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
     checks,
@@ -55,18 +91,18 @@ const getMetrics = async (req, res) => {
       redis_memory_info: redisInfo.split('\r\n').filter(line => line.startsWith('used_memory_human')),
     });
   } catch (err) {
-    req.log.error('Dev Metrics Fetch Error', { error: err.message });
+    console.error('Dev Metrics Fetch Error:', err.message);
     return res.status(500).json({ error: 'Failed to retrieve metrics.' });
   }
 };
 
 const getLogs = async (req, res) => {
   try {
-    const limit  = Math.min(parseInt(req.query.limit)  || 100, 500); // max 500 per page
+    const limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
     const offset = parseInt(req.query.offset) || 0;
-    const level  = req.query.level  || null;  // 'info' | 'warn' | 'error'
-    const search = req.query.search || null;  // free-text search in message
-    const timeframe = req.query.timeframe || null; // '1h' | '3h' | '1d' | '1w' | '1m'
+    const level  = req.query.level  || null;
+    const search = req.query.search || null;
+    const timeframe = req.query.timeframe || null;
 
     let where = [];
     const params = [];
@@ -95,14 +131,12 @@ const getLogs = async (req, res) => {
 
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-    // Total count for pagination metadata
     const countRes = await replicaDb.query(
       `SELECT COUNT(*) FROM app_logs ${whereClause}`,
       params
     );
     const total = parseInt(countRes.rows[0].count, 10);
 
-    // Paged logs
     const logsRes = await replicaDb.query(
       `SELECT id, level, message, meta, created_at FROM app_logs ${whereClause}
        ORDER BY created_at DESC LIMIT $${p} OFFSET $${p + 1}`,
@@ -121,7 +155,6 @@ const getLogs = async (req, res) => {
   }
 };
 
-// GET /api/dev/logs/count — quick total for badge display
 const getLogsCount = async (req, res) => {
   try {
     const level  = req.query.level  || null;
@@ -152,7 +185,6 @@ const getLogsCount = async (req, res) => {
   }
 };
 
-// GET /api/dev/logs/stream — Server-Sent Events live tail (replaces 10s polling)
 const streamLogs = async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -164,7 +196,6 @@ const streamLogs = async (req, res) => {
 
   let lastId = 0;
 
-  // Get the current max ID so we only stream NEW logs from this point forward
   try {
     const maxRes = await replicaDb.query('SELECT MAX(id) FROM app_logs');
     lastId = parseInt(maxRes.rows[0].max) || 0;
@@ -194,10 +225,8 @@ const streamLogs = async (req, res) => {
     }
   };
 
-  // Poll DB every 2 seconds for new log rows
   const interval = setInterval(poll, 2000);
 
-  // Clean up when client disconnects
   req.on('close', () => {
     clearInterval(interval);
     res.end();
@@ -211,7 +240,7 @@ const getDevUsers = async (req, res) => {
     );
     return res.json(result.rows);
   } catch (err) {
-    req.log.error('Get Dev Users Error', { error: err.message });
+    console.error('Get Dev Users Error:', err.message);
     return res.status(500).json({ error: 'Failed to retrieve developers.' });
   }
 };
@@ -223,7 +252,6 @@ const addDevUser = async (req, res) => {
   }
 
   try {
-    // Insert new developer account or upsert role to dev if user exists
     await primaryDb.query(
       `INSERT INTO users (name, email, role, verified)
        VALUES ($1, $2, 'dev', true)
@@ -235,7 +263,7 @@ const addDevUser = async (req, res) => {
 
     return res.json({ success: true, message: 'Developer added successfully.' });
   } catch (err) {
-    req.log.error('Add Dev User Error', { error: err.message });
+    console.error('Add Dev User Error:', err.message);
     return res.status(500).json({ error: 'Failed to add developer.' });
   }
 };
@@ -243,15 +271,13 @@ const addDevUser = async (req, res) => {
 const deleteDevUser = async (req, res) => {
   const { id } = req.params;
   try {
-    // Revoke dev access by setting role back to 'student' instead of deleting user account entirely
-    // (so student can still apply for certificates)
     await primaryDb.query(
       "UPDATE users SET role = 'student' WHERE id = $1",
       [id]
     );
     return res.json({ success: true, message: 'Developer role revoked.' });
   } catch (err) {
-    req.log.error('Revoke Dev User Error', { error: err.message });
+    console.error('Revoke Dev User Error:', err.message);
     return res.status(500).json({ error: 'Failed to revoke developer access.' });
   }
 };

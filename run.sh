@@ -26,16 +26,30 @@ echo "      --> Redis is healthy and accepting queries!"
 echo "[4/5] Applying PostgreSQL database schemas..."
 docker exec -i tce_postgres_primary psql -U tce_user -d tce_bonafide < db/schema.sql
 
-# 5. Start servers in parallel
-echo "[5/5] Launching backend Express API & frontend Vite servers..."
-echo "      --> Press Ctrl+C at any time to shut down both servers cleanly."
+# 5. Start microservices and frontend in parallel
+echo "[5/5] Launching microservices and React frontend locally..."
+echo "      --> Press Ctrl+C at any time to shut down all processes cleanly."
 
-# Start backend server
-npm start &
-BACKEND_PID=$!
+# Start student-service
+cd services/student-service
+npm run dev &
+STUDENT_PID=$!
+cd ../..
+
+# Start admin-service
+cd services/admin-service
+npm run dev &
+ADMIN_PID=$!
+cd ../..
+
+# Start dev-service
+cd services/dev-service
+npm run dev &
+DEV_PID=$!
+cd ../..
 
 # Start frontend Vite server
-cd client
+cd frontend
 npm run dev &
 FRONTEND_PID=$!
 cd ..
@@ -44,9 +58,11 @@ cd ..
 cleanup() {
   echo ""
   echo "=========================================================="
-  echo "   Stopping backend and frontend servers..."
+  echo "   Stopping all microservices and frontend server..."
   echo "=========================================================="
-  kill $BACKEND_PID 2>/dev/null || true
+  kill $STUDENT_PID 2>/dev/null || true
+  kill $ADMIN_PID 2>/dev/null || true
+  kill $DEV_PID 2>/dev/null || true
   kill $FRONTEND_PID 2>/dev/null || true
   exit 0
 }

@@ -1,9 +1,9 @@
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
-const redisClient = require('../cache/redis');
-const replicaDb = require('../db/replica');
-const primaryDb = require('../db/primary');
-const { sendVerificationEmail } = require('../helper/emailHelper');
+const redisClient = require('../../../shared/cache/redis');
+const replicaDb = require('../../../shared/db/replica');
+const primaryDb = require('../../../shared/db/primary');
+const { sendVerificationEmail } = require('../../../shared/helper/emailHelper');
 
 const requestOTP = async (req, res) => {
   const { email } = req.body;
@@ -102,7 +102,10 @@ const adminLogin = async (req, res) => {
 
   try {
     const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+    let adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+    if (adminPasswordHash && adminPasswordHash.includes('$$')) {
+      adminPasswordHash = adminPasswordHash.replace(/\$\$/g, '$');
+    }
 
     if (!adminEmail || !adminPasswordHash) {
       req.log.error('Admin configuration missing in env credentials.');

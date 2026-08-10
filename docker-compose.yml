@@ -51,6 +51,62 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
+  student-service:
+    build:
+      context: .
+      dockerfile: services/student-service/Dockerfile
+    container_name: student-service
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_PRIMARY_URL=postgres://tce_user:tce_secure_password@postgres_primary:5432/tce_bonafide
+      - DATABASE_REPLICA_URL=postgres://tce_user:tce_secure_password@postgres_replica:5432/tce_bonafide
+      - REDIS_URL=redis://:tce_redis_secure_password@redis:6379
+    depends_on:
+      - postgres_primary
+      - redis
+    restart: unless-stopped
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: services/admin-service/Dockerfile
+    container_name: admin-service
+    ports:
+      - "3002:3002"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_PRIMARY_URL=postgres://tce_user:tce_secure_password@postgres_primary:5432/tce_bonafide
+      - DATABASE_REPLICA_URL=postgres://tce_user:tce_secure_password@postgres_replica:5432/tce_bonafide
+      - REDIS_URL=redis://:tce_redis_secure_password@redis:6379
+    depends_on:
+      - postgres_primary
+      - redis
+    restart: unless-stopped
+
+  dev-service:
+    build:
+      context: .
+      dockerfile: services/dev-service/Dockerfile
+    container_name: dev-service
+    ports:
+      - "3003:3003"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_PRIMARY_URL=postgres://tce_user:tce_secure_password@postgres_primary:5432/tce_bonafide
+      - DATABASE_REPLICA_URL=postgres://tce_user:tce_secure_password@postgres_replica:5432/tce_bonafide
+      - REDIS_URL=redis://:tce_redis_secure_password@redis:6379
+      - STUDENT_SERVICE_URL=http://student-service:3001
+      - ADMIN_SERVICE_URL=http://admin-service:3002
+    depends_on:
+      - postgres_primary
+      - redis
+    restart: unless-stopped
+
 volumes:
   postgres_primary_data:
   redis_data:

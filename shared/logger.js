@@ -3,6 +3,8 @@ const DailyRotateFile = require('winston-daily-rotate-file');
 const primaryDb = require('./db/primary');
 const path = require('path');
 
+const serviceName = process.env.SERVICE_NAME || 'app';
+
 const dbTransport = new winston.transports.Console({
   format: winston.format.combine(
     winston.format.colorize(),
@@ -21,7 +23,7 @@ class DBLogTransport extends winston.Transport {
     });
 
     const level = info.level;
-    const message = info.message;
+    const message = `[${serviceName}] ${info.message}`;
     const meta = info.metadata || {};
     const requestId = info.requestId || null;
 
@@ -38,7 +40,7 @@ class DBLogTransport extends winston.Transport {
 
 // Create rotating log files transports
 const fileInfoTransport = new DailyRotateFile({
-  filename: path.join(__dirname, 'logs', 'application-%DATE%.log'),
+  filename: path.join(__dirname, '..', '..', 'logs', `${serviceName}-%DATE%.log`),
   datePattern: 'YYYY-MM-DD',
   zippedArchive: true,
   maxSize: '20m',
@@ -47,7 +49,7 @@ const fileInfoTransport = new DailyRotateFile({
 });
 
 const fileErrorTransport = new DailyRotateFile({
-  filename: path.join(__dirname, 'logs', 'error-%DATE%.log'),
+  filename: path.join(__dirname, '..', '..', 'logs', `${serviceName}-error-%DATE%.log`),
   datePattern: 'YYYY-MM-DD',
   zippedArchive: true,
   maxSize: '20m',
