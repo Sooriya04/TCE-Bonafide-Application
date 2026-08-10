@@ -229,8 +229,12 @@ export default function Admin() {
                     <td style={{ maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {form.form_data?.branch || '—'}
                     </td>
-                    <td>{form.form_data?.certificateFor || '—'}</td>
-                    <td style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatDate(form.created_at)}</td>
+                     <td>
+                       {form.form_data?.certificateFor === 'Custom' 
+                         ? (form.form_data?.customPurpose || 'Custom') 
+                         : (form.form_data?.certificateFor || '—')}
+                     </td>
+                     <td style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatDate(form.created_at)}</td>
                     <td>
                       <button
                         onClick={() => toggleDownloaded(form.id, form.downloaded)}
@@ -319,7 +323,9 @@ export default function Admin() {
                     <div key={item.id} className="history-item">
                       <div className="history-header">
                         <span className="history-purpose" style={{ fontWeight: '600', color: 'var(--accent)' }}>
-                          {item.form_data?.certificateFor || '—'}
+                          {item.form_data?.certificateFor === 'Custom' 
+                            ? (item.form_data?.customPurpose || 'Custom') 
+                            : (item.form_data?.certificateFor || '—')}
                         </span>
                         <span className="history-date" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                           {formatDate(item.created_at)}

@@ -13,7 +13,8 @@ const STATIC_FIELDS = [
   { id: '7', key: 'course', label: 'Course', field_type: 'select', options: ["B.E", "B.Tech", "M.E", "MCA", "B.Arch", "M.Arch", "M.Plan", "M.Sc", "Part Time B.E", "B.Des"], placeholder: '', hint: '', required: true },
   { id: '8', key: 'branch', label: 'Branch', field_type: 'select', options: ["Architecture", "Civil Engineering", "Communication Systems", "Computer Applications", "Computer Science and Business Systems", "Computer Science and Engineering", "Computer Science and Engineering (AI & ML)", "Construction Engineering and Management", "Data Science (5 Years Integrated Course)", "Electrical and Computer Engineering", "Electrical and Electronics Engineering", "Electronics and Communication Engineering", "Electronics Engineering (VLSI Design & Tech.)", "Embedded System Technologies", "Fashion Technology", "Information Technology", "Interior Design", "Mechanical Engineering", "Mechatronics", "Structural Engineering", "Urban Planning"], placeholder: '', hint: '', required: true },
   { id: '9', key: 'certificateFor', label: 'Certificate For', field_type: 'select', options: ["Educational Loan", "Scholarship", "Bus Pass", "Passport", "VISA", "Custom"], placeholder: '', hint: '', required: true },
-  { id: '10', key: 'scholarshipType', label: 'Scholarship Type (If Scholarship selected)', field_type: 'text', options: [], placeholder: 'e.g., Post Metric Scholarship', hint: 'Required if you chose Scholarship.', required: false }
+  { id: '10', key: 'scholarshipType', label: 'Scholarship Type (If Scholarship selected)', field_type: 'text', options: [], placeholder: 'e.g., Post Metric Scholarship', hint: 'Required if you chose Scholarship.', required: false },
+  { id: '11', key: 'customPurpose', label: 'Custom Purpose (If Custom selected)', field_type: 'text', options: [], placeholder: 'e.g., Opening a Bank Account', hint: 'Specify the purpose for the certificate.', required: false }
 ];
 
 export default function Form() {
@@ -28,7 +29,8 @@ export default function Form() {
     course: '',
     branch: '',
     certificateFor: '',
-    scholarshipType: ''
+    scholarshipType: '',
+    customPurpose: ''
   });
   const [loading] = useState(false);
   const [error, setError] = useState(null);
@@ -63,13 +65,16 @@ export default function Form() {
   const renderField = (field) => {
     const opts = typeof field.options === 'string' ? JSON.parse(field.options) : (field.options || []);
     if (field.key === 'scholarshipType' && formData.certificateFor !== 'Scholarship') return null;
+    if (field.key === 'customPurpose' && formData.certificateFor !== 'Custom') return null;
+
+    const isRequired = field.required || (field.key === 'customPurpose' && formData.certificateFor === 'Custom');
 
     const input = field.field_type === 'select' ? (
       <select
         className="form-select"
         value={formData[field.key] || ''}
         onChange={e => change(field.key, e.target.value)}
-        required={field.required}
+        required={isRequired}
       >
         <option value="" disabled>Select…</option>
         {opts.map((o, i) => <option key={i} value={o}>{o}</option>)}
@@ -81,7 +86,7 @@ export default function Form() {
         placeholder={field.placeholder || ''}
         value={formData[field.key] || ''}
         onChange={e => change(field.key, e.target.value)}
-        required={field.required && field.key !== 'scholarshipType'}
+        required={isRequired}
       />
     );
 
@@ -89,7 +94,7 @@ export default function Form() {
       <div className="field-item" key={field.id}>
         <label className="field-label">
           {field.label}
-          {field.required && <span className="required">*</span>}
+          {isRequired && <span className="required">*</span>}
         </label>
         {input}
         {field.hint && <span className="field-hint">{field.hint}</span>}
@@ -104,6 +109,7 @@ export default function Form() {
 
     fields.forEach((field, idx) => {
       if (field.key === 'scholarshipType' && formData.certificateFor !== 'Scholarship') return;
+      if (field.key === 'customPurpose' && formData.certificateFor !== 'Custom') return;
 
       if (PAIRED_KEYS.has(field.key)) {
         pairBuffer.push(field);
@@ -140,7 +146,7 @@ export default function Form() {
   /* ── Success ── */
   if (success) {
     return (
-      <div className="page-container">
+      <div className="page-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 'calc(100vh - 180px)' }}>
         <div className="form-panel" style={{ textAlign: 'center', padding: '48px 32px' }}>
           <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>✓</div>
           <h2 style={{ color: 'var(--success)', fontSize: '1.2rem', fontWeight: '700', marginBottom: '8px' }}>
@@ -161,6 +167,7 @@ export default function Form() {
   if (isPreview) {
     const visibleFields = fields.filter(f => {
       if (f.key === 'scholarshipType' && formData.certificateFor !== 'Scholarship') return false;
+      if (f.key === 'customPurpose' && formData.certificateFor !== 'Custom') return false;
       return true;
     });
 

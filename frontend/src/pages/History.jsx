@@ -51,7 +51,11 @@ export default function History() {
               {/* Card Header */}
               <div className="student-req-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
                 <div>
-                  <h3 className="student-req-purpose">{req.form_data?.certificateFor || 'Bonafide Certificate'}</h3>
+                  <h3 className="student-req-purpose">
+                    {req.form_data?.certificateFor === 'Custom' 
+                      ? (req.form_data?.customPurpose || 'Custom') 
+                      : (req.form_data?.certificateFor || 'Bonafide Certificate')}
+                  </h3>
                   <p className="student-req-date">Submitted on {formatDate(req.created_at)}</p>
                 </div>
                 <span className={`badge ${req.downloaded ? 'badge-done' : 'badge-pending'}`} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>

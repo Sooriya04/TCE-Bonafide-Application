@@ -29,11 +29,16 @@ export default function Layout({ children, onLogout, user }) {
 
           {/* Desktop Nav */}
           <nav className="header-nav-desktop">
-            {user.role === 'admin' ? (
-              <Link to="/admin" style={navLinkStyle('/admin')}>Dashboard</Link>
-            ) : user.role === 'dev' || user.role === 'developer' ? (
+            {user.role === 'admin' && (
+              <>
+                <Link to="/admin" style={navLinkStyle('/admin')}>Dashboard</Link>
+                <Link to="/admin/dev" style={navLinkStyle('/admin/dev')}>Developer Console</Link>
+              </>
+            )}
+            {(user.role === 'dev' || user.role === 'developer') && (
               <Link to="/admin/dev" style={navLinkStyle('/admin/dev')}>Developer Console</Link>
-            ) : (
+            )}
+            {user.role !== 'admin' && user.role !== 'dev' && user.role !== 'developer' && (
               <>
                 <Link to="/form" style={navLinkStyle('/form')}>Apply</Link>
                 <Link to="/history" style={navLinkStyle('/history')}>My Requests</Link>
@@ -73,11 +78,16 @@ export default function Layout({ children, onLogout, user }) {
       {/* Mobile dropdown menu */}
       {user && menuOpen && (
         <div className="mobile-menu">
-          {user.role === 'admin' ? (
-            <Link to="/admin" className="mobile-menu-link" onClick={() => setMenuOpen(false)}>Dashboard</Link>
-          ) : user.role === 'dev' || user.role === 'developer' ? (
+          {user.role === 'admin' && (
+            <>
+              <Link to="/admin" className="mobile-menu-link" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+              <Link to="/admin/dev" className="mobile-menu-link" onClick={() => setMenuOpen(false)}>Developer Console</Link>
+            </>
+          )}
+          {(user.role === 'dev' || user.role === 'developer') && (
             <Link to="/admin/dev" className="mobile-menu-link" onClick={() => setMenuOpen(false)}>Developer Console</Link>
-          ) : (
+          )}
+          {user.role !== 'admin' && user.role !== 'dev' && user.role !== 'developer' && (
             <>
               <Link to="/form" className="mobile-menu-link" onClick={() => setMenuOpen(false)}>Apply for Certificate</Link>
               <Link to="/history" className="mobile-menu-link" onClick={() => setMenuOpen(false)}>My Requests</Link>

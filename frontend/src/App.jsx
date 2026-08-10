@@ -31,7 +31,11 @@ export default function App() {
   }, []);
 
   const handleLogout = async () => {
-    await api.post('/auth/logout');
+    try {
+      await api.post('/auth/logout');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
     setUser(null);
   };
 
