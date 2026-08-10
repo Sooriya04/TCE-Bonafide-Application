@@ -27,15 +27,31 @@ CREATE TABLE IF NOT EXISTS certificate_template_history (
   saved_at TIMESTAMPTZ DEFAULT NOW(),
   saved_by TEXT
 );
--- Bonafide Forms Submissions
+-- Bonafide Forms Submissions (Partitioned by Range on created_at)
 CREATE TABLE IF NOT EXISTS bonafide_forms (
-  id TEXT PRIMARY KEY,
-  -- Deterministic ID: ROLLNO_PURPOSE_DATE
+  id TEXT,
   form_data JSONB NOT NULL,
-  -- Contains all submitted form field values dynamically
   downloaded BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (id, created_at)
+) PARTITION BY RANGE (created_at);
+
+-- Yearly Range Partitions
+CREATE TABLE IF NOT EXISTS bonafide_forms_2025 PARTITION OF bonafide_forms
+    FOR VALUES FROM ('2025-01-01 00:00:00+00') TO ('2026-01-01 00:00:00+00');
+
+CREATE TABLE IF NOT EXISTS bonafide_forms_2026 PARTITION OF bonafide_forms
+    FOR VALUES FROM ('2026-01-01 00:00:00+00') TO ('2027-01-01 00:00:00+00');
+
+CREATE TABLE IF NOT EXISTS bonafide_forms_2027 PARTITION OF bonafide_forms
+    FOR VALUES FROM ('2027-01-01 00:00:00+00') TO ('2028-01-01 00:00:00+00');
+
+CREATE TABLE IF NOT EXISTS bonafide_forms_2028 PARTITION OF bonafide_forms
+    FOR VALUES FROM ('2028-01-01 00:00:00+00') TO ('2029-01-01 00:00:00+00');
+
+CREATE TABLE IF NOT EXISTS bonafide_forms_default PARTITION OF bonafide_forms
+    DEFAULT;
+
 -- Indexes for Read Replica performance
 CREATE INDEX IF NOT EXISTS idx_bonafide_rollno ON bonafide_forms ((form_data->>'rollno'));
 CREATE INDEX IF NOT EXISTS idx_bonafide_name ON bonafide_forms (lower(form_data->>'name'));

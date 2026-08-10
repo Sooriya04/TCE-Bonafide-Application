@@ -80,7 +80,7 @@ const submitForm = async (req, res) => {
 
     return res.status(201).json({ id: docId, message: 'Application submitted successfully.' });
   } catch (err) {
-    console.error('Submit Form Error:', err.message);
+    req.log.error('Submit Form Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to process application.' });
   }
 };
@@ -99,7 +99,7 @@ const getStudentForms = async (req, res) => {
     );
     return res.json(result.rows);
   } catch (err) {
-    console.error('Get Student Forms Error:', err.message);
+    req.log.error('Get Student Forms Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to fetch your applications.' });
   }
 };

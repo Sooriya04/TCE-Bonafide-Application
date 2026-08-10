@@ -26,8 +26,8 @@ const requestOTP = async (req, res) => {
       user = insertRes.rows[0];
     }
 
-    // 2. Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // 2. Generate 6-digit OTP (cryptographically secure)
+    const otp = crypto.randomInt(100000, 999999).toString();
 
     // 3. Store OTP in Redis (10 minutes TTL)
     await redisClient.set(`otp:${email}`, otp, 'EX', 600);
@@ -133,6 +133,12 @@ const adminLogin = async (req, res) => {
 
 const logout = (req, res) => {
   req.session.destroy((err) => {
+    res.clearCookie('connect.sid', {
+      path: '/',
+      secure: process.env.NODE_ENV === 'production' && process.env.SECURE_COOKIES !== 'false',
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'production' && process.env.SECURE_COOKIES !== 'false' ? 'none' : 'lax'
+    });
     if (err) {
       return res.status(500).json({ error: 'Could not log out.' });
     }
@@ -157,9 +163,19 @@ const devLogin = async (req, res) => {
       return res.status(401).json({ error: 'Developer account not found or access restricted.' });
     }
 
-    // If password check
-    const devSecret = process.env.DEV_SECRET;
-    if (password !== devSecret) {
+    // Hashed password check
+    let devPasswordHash = process.env.DEV_PASSWORD_HASH;
+    if (devPasswordHash && devPasswordHash.includes('$$')) {
+      devPasswordHash = devPasswordHash.replace(/\$\$/g, '$');
+    }
+
+    if (!devPasswordHash) {
+      req.log.error('Dev password hash configuration missing in env credentials.');
+      return res.status(500).json({ error: 'Dev auth configuration error.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, devPasswordHash);
+    if (!isMatch) {
       return res.status(401).json({ error: 'Invalid developer credentials.' });
     }
 

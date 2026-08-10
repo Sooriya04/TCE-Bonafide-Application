@@ -67,11 +67,32 @@ const getHealth = async (req, res) => {
   checks.student_service = studentHealth;
   checks.admin_service = adminHealth;
 
+  let backupInfo = {
+    last_status: 'unknown',
+    last_timestamp: 'never',
+    last_filename: 'N/A',
+    last_error: null
+  };
+
+  try {
+    const [status, timestamp, filename, error] = await Promise.all([
+      redisClient.get('backup:last_status'),
+      redisClient.get('backup:last_timestamp'),
+      redisClient.get('backup:last_filename'),
+      redisClient.get('backup:last_error')
+    ]);
+    if (status) backupInfo.last_status = status;
+    if (timestamp) backupInfo.last_timestamp = timestamp;
+    if (filename) backupInfo.last_filename = filename;
+    if (error) backupInfo.last_error = error;
+  } catch (_) {}
+
   const isHealthy = Object.values(checks).every(v => v === true);
-  return res.status(isHealthy ? 200 : 200).json({ // Return 200 even if degraded to let dashboard see individual service checks
+  return res.status(200).json({ // Return 200 even if degraded to let dashboard see individual service checks
     status: isHealthy ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
     checks,
+    backup: backupInfo
   });
 };
 
@@ -91,7 +112,7 @@ const getMetrics = async (req, res) => {
       redis_memory_info: redisInfo.split('\r\n').filter(line => line.startsWith('used_memory_human')),
     });
   } catch (err) {
-    console.error('Dev Metrics Fetch Error:', err.message);
+    req.log.error('Dev Metrics Fetch Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to retrieve metrics.' });
   }
 };
@@ -150,7 +171,7 @@ const getLogs = async (req, res) => {
       offset,
     });
   } catch (err) {
-    console.error('Dev fetch logs error:', err.message);
+    req.log.error('Dev fetch logs error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to retrieve log data.' });
   }
 };
@@ -240,7 +261,7 @@ const getDevUsers = async (req, res) => {
     );
     return res.json(result.rows);
   } catch (err) {
-    console.error('Get Dev Users Error:', err.message);
+    req.log.error('Get Dev Users Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to retrieve developers.' });
   }
 };
@@ -263,7 +284,7 @@ const addDevUser = async (req, res) => {
 
     return res.json({ success: true, message: 'Developer added successfully.' });
   } catch (err) {
-    console.error('Add Dev User Error:', err.message);
+    req.log.error('Add Dev User Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to add developer.' });
   }
 };
@@ -277,7 +298,7 @@ const deleteDevUser = async (req, res) => {
     );
     return res.json({ success: true, message: 'Developer role revoked.' });
   } catch (err) {
-    console.error('Revoke Dev User Error:', err.message);
+    req.log.error('Revoke Dev User Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to revoke developer access.' });
   }
 };

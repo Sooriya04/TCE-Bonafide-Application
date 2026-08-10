@@ -54,7 +54,7 @@ async function generateBonafideDocx(formData) {
       year: yearValue,
       course: sanitizeForDocx(formData.course),
       branch: branchValue,
-      certificateFor: sanitizeForDocx(formData.certificateFor),
+      certificateFor: formData.certificateFor === 'Custom' ? sanitizeForDocx(formData.customPurpose) : sanitizeForDocx(formData.certificateFor),
       scholarshipType: scholarshipType,
       date: formatDate(sanitizeForDocx(formData.date)),
       academicYear: sanitizeForDocx(formData.academicYear),

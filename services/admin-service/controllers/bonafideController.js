@@ -68,7 +68,7 @@ const getAdminForms = async (req, res) => {
 
     return res.json(payload);
   } catch (err) {
-    console.error('Get Admin Forms Error:', err.message);
+    req.log.error('Get Admin Forms Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to fetch certificate applications.' });
   }
 };
@@ -91,7 +91,7 @@ const toggleDownloaded = async (req, res) => {
 
     return res.json({ success: true, message: 'Status updated successfully.' });
   } catch (err) {
-    console.error('Toggle Downloaded Error:', err.message);
+    req.log.error('Toggle Downloaded Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to update downloaded status.' });
   }
 };
@@ -120,7 +120,7 @@ const downloadDocx = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=bonafide-${id}.docx`);
     return res.send(gBuffer);
   } catch (err) {
-    console.error('Download DOCX Error:', err.message);
+    req.log.error('Download DOCX Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to generate download.' });
   }
 };
@@ -140,7 +140,7 @@ const getStudentHistoryForAdmin = async (req, res) => {
     );
     return res.json(result.rows);
   } catch (err) {
-    console.error('Get Student History For Admin Error:', err.message);
+    req.log.error('Get Student History For Admin Error', { error: err.message, stack: err.stack });
     return res.status(500).json({ error: 'Failed to fetch student history.' });
   }
 };

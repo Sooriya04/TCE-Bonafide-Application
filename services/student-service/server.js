@@ -26,7 +26,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const app = express();
-const PORT = process.env.STUDENT_SERVICE_PORT || 3001;
+const PORT = process.env.PORT || process.env.STUDENT_SERVICE_PORT || 3001;
 
 app.set('trust proxy', 1);
 
@@ -58,8 +58,20 @@ app.use(helmet({
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')) {
-      return callback(null, true);
+    try {
+      const url = new URL(origin);
+      const isAllowed = allowedOrigins.includes(origin) || 
+                        origin.startsWith('http://localhost:') || 
+                        origin.startsWith('https://localhost:') ||
+                        url.hostname === 'tceapps.in' ||
+                        url.hostname.endsWith('.tceapps.in') ||
+                        url.hostname === 'tce.edu' ||
+                        url.hostname.endsWith('.tce.edu');
+      if (isAllowed) {
+        return callback(null, true);
+      }
+    } catch (e) {
+      // Fallback if URL parsing fails
     }
     callback(new Error('Not allowed by CORS'));
   },
@@ -87,6 +99,7 @@ app.use(session({
 app.use((req, res, next) => {
   req.id = uuidv4();
   req.log = logger.child({ requestId: req.id });
+  req.log.info(`${req.method} ${req.url}`);
   next();
 });
 
